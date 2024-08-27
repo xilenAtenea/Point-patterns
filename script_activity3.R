@@ -596,52 +596,59 @@ data_2010 <- accidents_data %>% filter(ano == 2010)
 
 # Type of vehicle
 
-# 
+# Point pattern object (ppp) for 2009 and 2010
 window <- owin(xrange = range(accidents_data$coordenada_x_km), 
                yrange = range(accidents_data$coordenada_y_km))
 
 accidents_2009_ppp <- ppp(data_2009$coordenada_x_km, data_2009$coordenada_y_km, window = window, marks = data_2009$condicion)
 accidents_2010_ppp <- ppp(data_2010$coordenada_x_km, data_2010$coordenada_y_km, window = window, marks = data_2010$condicion)
 
-# 
+# Initial visualization of point patterns
 par(mfrow = c(1, 2))
 plot(accidents_2009_ppp, main = "Homicides by Traffic Accidents (2009)", cols = 1:3)
 plot(accidents_2010_ppp, main = "Homicides by Traffic Accidents (2010)", cols = 1:3)
 
-# 
+# Quadrant analysis
 quadrat_test_2009 <- quadrat.test(accidents_2009_ppp, nx = 4, ny = 4)
-quadrat_test_2010 <- quadrat.test(accidents_2010_ppp, nx = 4, ny = 4)
+quadrat_test_2009
 
-# 
+quadrat_test_2010 <- quadrat.test(accidents_2010_ppp, nx = 4, ny = 4)
+quadrat_test_2010
+
+# Density estimation using Kernel
 density_2009 <- density(accidents_2009_ppp, sigma = bw.diggle)
 density_2010 <- density(accidents_2010_ppp, sigma = bw.diggle)
 
-# 
+# Density plots
 par(mfrow = c(1, 2))
 plot(density_2009, main = "Density of Homicides (2009)")
 plot(accidents_2009_ppp, add = TRUE)
 plot(density_2010, main = "Density of Homicides (2010)")
 plot(accidents_2010_ppp, add = TRUE)
 
+
 K_ripley_2009 <- Kest(accidents_2009_ppp)
 K_ripley_2010 <- Kest(accidents_2010_ppp)
 
-# 
+# Ripley's K function
 par(mfrow = c(1, 2))
-plot(K_ripley_2009, main = "K de Ripley - 2009")
-plot(K_ripley_2010, main = "K de Ripley - 2010")
+plot(K_ripley_2009, main = "Ripley's K function - 2009")
+plot(K_ripley_2010, main = "Ripley's K function - 2010")
 
-#  - 2009
+# Create matrix of spatial weights - 2009
 coords_2009 <- cbind(data_2009$coordenada_x_km, data_2009$coordenada_y_km)
 knn_2009 <- knearneigh(coords_2009, k = 4)
 nb_2009 <- knn2nb(knn_2009)
 listw_2009 <- nb2listw(nb_2009, style = "W")
+
+
+sum(is.na(accidents_2009_ppp$marks)) 
 
 # Moran Test 2009
 moran_test_2009 <- moran.test(as.numeric(accidents_2009_ppp$marks), listw_2009)
 print(moran_test_2009)
 
 
-#  - 2010
+#  Create matrix of spatial weights - 2010
 # Moran Test 2010
 
