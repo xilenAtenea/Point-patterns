@@ -305,8 +305,8 @@ accidents_data$lugar_insp. <- gsub("^HOSPITAL C[.]?H[.]?T[.]?$", "HOSPITAL C.H.T
 accidents_data$lugar_insp. <- gsub("^H[.]? PRIMITIVO IGLESIAS$", "PRIMITIVO IGLESIAS", accidents_data$lugar_insp.)
 accidents_data$lugar_insp. <- gsub("^I[.]?S[.]?S[.]?$", "I.S.S.", accidents_data$lugar_insp.)
 
-!!!!!!!!!!!!!!!!!!!!!!!
-# TODO agrupar las VIAs
+accidents_data <- accidents_data %>%
+  mutate(lugar_insp. = ifelse(grepl("VIA", lugar_insp., ignore.case = TRUE), "VIA", lugar_insp.))
 
 unique(accidents_data$lugar_insp.)
 table(accidents_data$lugar_insp.)
@@ -400,7 +400,10 @@ ggplot(accidents_data, aes(x = mes_accidente, fill = factor(ano))) +
        x = "Month of Accident",
        y = "Number of Accidents",
        fill = "Year") +
-  scale_fill_manual(values = c("2009" = "blue", "2010" = "red"))
+  scale_fill_manual(values = c("2009" = "blue", "2010" = "red"))+
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
 
 # Distribution of accidents by comuna with year comparison
 ggplot(accidents_data, aes(x = as.factor(comuna), fill = factor(ano))) +
@@ -420,9 +423,11 @@ ggplot(accidents_data, aes(x = sexo, fill = factor(ano))) +
        x = "Gender",
        y = "Number of Accidents",
        fill = "Year") +
-  scale_fill_manual(values = c("2009" = "purple", "2010" = "pink"))
-
-# TODO poner los numeros del valor de las barras en el tope
+  scale_fill_manual(values = c("2009" = "purple", "2010" = "pink")) +
+  geom_text(stat = "count", aes(label = ..count..), 
+            position = position_dodge(width = 0.9), 
+            vjust = -0.5, 
+            color = "black")
 
 # Distribution of accidents by age group with year comparison
 ggplot(accidents_data, aes(x = edad_agrupada, fill = factor(ano))) +
@@ -476,15 +481,20 @@ ggplot(accidents_data, aes(x = condicion, fill = factor(ano))) +
 # Homicides by traffic accidents, broken down by month and gender with year comparison
 ggplot(accidents_data, aes(x = mes_accidente, fill = sexo)) +
   geom_bar(position = "dodge") +
-  facet_wrap(~ ano) +
+  facet_wrap(~ ano, scales = "free_x") +
   theme_minimal() +
   labs(title = "Homicides by Traffic Accidents in Cali - By Month and Gender",
        x = "Month of Accident",
        y = "Number of Homicides",
        fill = "Gender") +
-  scale_fill_manual(values = c("M" = "lightblue", "F" = "pink"))
+  scale_fill_manual(values = c("M" = "lightblue", "F" = "pink")) +
+  theme(
+    panel.spacing = unit(2, "lines"),
+    axis.line = element_line(color = "grey"),
+    panel.border = element_rect(color = "grey", fill = NA, size = 0.5),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
 
-# TODO ponerle división marcada entre las dos gráficas x año
 
 # Homicides by traffic accidents, broken down by age group and condition with year comparison
 ggplot(accidents_data, aes(x = edad_agrupada, fill = condicion)) +
@@ -510,8 +520,6 @@ ggplot(accidents_data, aes(x = condicion, y = edad, fill = factor(ano))) +
   scale_fill_manual(values = c("2009" = "lightblue", "2010" = "darkblue"))
 
 
-
-!!!!!!!!!! Esta no me convence, se ve como desorganizada pero quería que tuvieramos más graficos aparte de barras y boxplots...
 # Pie chart of accidents by condition with year comparison
 
 accident_condition <- accidents_data %>%
