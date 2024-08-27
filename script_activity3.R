@@ -5,7 +5,10 @@ to_be_loaded <- c("readxl",
                   "dplyr",
                   "VIM",
                   "patchwork",
-                  "ggplot2"
+                  "ggplot2",
+                  "gtsummary",
+                  "gridExtra",
+                  "lubridate"
 )
 
 for (pck in to_be_loaded) {
@@ -20,9 +23,11 @@ library(dplyr)
 library(VIM)
 library(patchwork)
 library(ggplot2)
+library(gtsummary)
+library(gridExtra)
+library(lubridate)
 
 # EDA -------------------------------------------------------------------------
-
 
 # Loading the data
 data_2009 <- read_xlsx('AccidentesFatales_2009.xlsx')
@@ -118,7 +123,8 @@ unique(accidents_data$hora_fallecimiento) # Needs cleaning (time standarization)
 unique(accidents_data$hora_accidente) # Needs cleaning (time standarization) and null handling
 unique(accidents_data$dia_semana_fallecimiento)
 unique(accidents_data$dia_semana_accidente)  # Needs cleaning
-unique(accidents_data$condiccion) # Needs cleaning (agrupation)
+unique(accidents_data$lugar_insp.)
+unique(accidents_data$condicion) # Needs cleaning (agrupation)
 unique(accidents_data$vehiculos)
 unique(accidents_data$ano)
 
@@ -127,9 +133,10 @@ unique(accidents_data$ano)
 accidents_data$mes_accidente[accidents_data$mes_accidente == "OCTOBRE"] <- "OCTUBRE"
 unique(accidents_data$mes_accidente)
 
+
 # Cleaning "barrio"
 table(accidents_data$barrio)
-accidents_data<- accidents_data %>% select(-c("barrio"))# after extensive analysis, it was determined to not use "barrio" varaible
+accidents_data<- accidents_data %>% select(-c("barrio"))# after extensive analysis, it was determined to not use "barrio" variable
 
 
 # Cleaning "sexo"
@@ -137,18 +144,16 @@ table(accidents_data$sexo) # F 113  M 484
 accidents_data$sexo[is.na(accidents_data$sexo)] <- "M" # Mode based imputation
 table(accidents_data$sexo) # F 113  M 486
 
-# Cleaning "edad"
 
+# Cleaning "edad"
 accidents_data$edad <- as.numeric(accidents_data$edad)
 #accidents_data$edad <- as.integer(accidents_data$edad)
 summary(accidents_data$edad)
 
 # KNN imputation (k-Nearest Neighbour Imputation)
-accidents_data_imputed <- kNN(accidents_data, variable = "edad", k=10) # put results in new df for comparison purposes
+accidents_data_imputed <- kNN(accidents_data, variable = "edad", k=5) # put results in new df for comparison purposes
 
-# imputation result
-summary(accidents_data_imputed$edad)
-
+summary(accidents_data_imputed$edad)# imputation result
 
 p1 <- ggplot(accidents_data, aes(x = edad)) + 
   geom_histogram(binwidth = 5, fill = 'blue', alpha = 0.5) +
@@ -160,10 +165,11 @@ p2 <- ggplot(accidents_data_imputed, aes(x = edad)) +
 
 (p1 | p2) # plot histograms side to side
 
-# replace old dataframe
-accidents_data <- accidents_data_imputed
+accidents_data <- accidents_data_imputed # replace old dataframe
+accidents_data <- accidents_data %>% select(-c("edad_imp")) # Droping unnecessary column
 
-# Cleaning "edad_agrupada"
+
+# Cleaning and handling NA "edad_agrupada"
 unique(accidents_data$edad_agrupada)
 
 accidents_data$edad_agrupada[accidents_data$edad_agrupada %in% c("80 Y +", "80Y+")] <- "80Y+"
@@ -176,7 +182,8 @@ accidents_data$edad_agrupada <- cut(accidents_data$edad, # Change intervals to 1
 unique(accidents_data$edad_agrupada)
 table(accidents_data$edad_agrupada)
 
-#sum(is.na(accidents_data$edad_agrupada)) # 0
+# sum(is.na(accidents_data$edad_agrupada)) # 0
+
 
 # Cleaning "hora_fallecimiento"
 unique(accidents_data$hora_fallecimiento)
@@ -206,15 +213,69 @@ unique(accidents_data$hora_fallecimiento)
 
 # Handling NA "hora_fallecimiento"
 
-# NOTA: Imputación multiple
+# Convert "HH:MM" to minutes since midnight
+convert_to_minutes <- function(time_str) {
+  if (is.na(time_str)) return(NA)
+  time_parts <- strsplit(time_str, ":")[[1]]
+  hours <- as.numeric(time_parts[1])
+  minutes <- as.numeric(time_parts[2])
+  return(hours * 60 + minutes)
+}
 
+accidents_data$hora_fallecimiento_minutes <- sapply(accidents_data$hora_fallecimiento, convert_to_minutes)
+
+imputed_data <- kNN(accidents_data, variable = "hora_fallecimiento_minutes", k = 5) # Perform KNN imputation
+
+# Convert the imputed minutes back to "HH:MM"
+convert_to_time <- function(minutes) {
+  if (is.na(minutes)) return(NA)
+  hours <- floor(minutes / 60)
+  mins <- round(minutes %% 60)
+  return(sprintf("%02d:%02d", hours, mins))
+}
+
+# Apply the reverse conversion to obtain the imputed values in HH:MM
+imputed_data$hora_fallecimiento <- sapply(imputed_data$hora_fallecimiento_minutes, convert_to_time)
+
+accidents_data <- imputed_data # replace old dataframe
+accidents_data <- accidents_data %>% select(-c("hora_fallecimiento_minutes_imp", "hora_fallecimiento_minutes")) # Droping unnecessary column
+
+unique(accidents_data$hora_fallecimiento)
+# sum(is.na(accidents_data$hora_fallecimiento)) # 0
 
 
 # Cleaning "hora_accidente"
 unique(accidents_data$hora_accidente)
 
-# NOTA: Imputación multiple
+convert_fraction_to_hhmm <- function(fraction) {
+  hours <- floor(fraction * 24)
+  minutes <- round((fraction * 24 - hours) * 60)
+  return(sprintf("%02d:%02d", hours, minutes))
+}
 
+is_fraction <- grepl("^[0-9]+\\.?[0-9]*$", accidents_data$hora_accidente)
+accidents_data$hora_accidente[is_fraction] <- sapply(as.numeric(accidents_data$hora_accidente[is_fraction]), convert_fraction_to_hhmm)
+
+accidents_data$hora_accidente[!is_fraction] <- NA # Convert negative timestamps to NA 
+
+unique(accidents_data$hora_accidente)
+sum(is.na(accidents_data$hora_accidente))
+
+
+# Handling NA "hora_accidente"
+accidents_data$hora_accidente_minutes <- sapply(accidents_data$hora_accidente, convert_to_minutes)
+
+imputed_data_hora_accidente <- kNN(accidents_data, variable = "hora_accidente_minutes", k = 5) # Perform KNN imputation
+
+# Apply the reverse conversion to obtain the imputed values in HH:MM
+imputed_data_hora_accidente$hora_accidente <- sapply(imputed_data_hora_accidente$hora_accidente_minutes, convert_to_time)
+
+accidents_data <- imputed_data_hora_accidente # replace old dataframe
+accidents_data <- accidents_data %>% select(-c("hora_accidente_minutes_imp", "hora_accidente_minutes"))
+
+unique(accidents_data$hora_accidente)
+# sum(is.na(accidents_data$hora_accidente)) # 0
+# table(accidents_data$hora_accidente)
 
 
 # Cleaning "dia_semana_accidente"
@@ -222,6 +283,37 @@ unique(accidents_data$dia_semana_accidente)
 
 accidents_data$dia_semana_accidente <- toupper(accidents_data$dia_semana_accidente)
 unique(accidents_data$dia_semana_accidente)
+
+
+# Cleaning "lugar_insp."
+unique(accidents_data$lugar_insp.)
+
+accidents_data$lugar_insp. <- gsub("^CL[.]?\\s*REM[EDIOS]*$", "CL. REMEDIOS", accidents_data$lugar_insp.)
+accidents_data$lugar_insp. <- gsub("^CL[.]?\\s*TEQUENDAMA$", "CL. TEQUENDAMA", accidents_data$lugar_insp.)
+accidents_data$lugar_insp. <- gsub("^CL[.]?\\s*SANTILLANA$", "CL. SANTILLANA", accidents_data$lugar_insp.)
+accidents_data$lugar_insp. <- gsub("^CL[.]?\\s*SANTILANA$", "CL. SANTILLANA", accidents_data$lugar_insp.)
+accidents_data$lugar_insp. <- gsub("^CL[.]?\\s*SANTIAGO DE CALI$", "CL. SANTIAGO", accidents_data$lugar_insp.)
+accidents_data$lugar_insp. <- gsub("^CL\\s*VALLE LILI$", "CL. VALLE LILI", accidents_data$lugar_insp.)
+accidents_data$lugar_insp. <- gsub("^VALLE LILI$", "CL. VALLE LILI", accidents_data$lugar_insp.)
+accidents_data$lugar_insp. <- gsub("^CL[.]?\\s*OCCIDENTE$", "CL. OCCIDENTE", accidents_data$lugar_insp.)
+accidents_data$lugar_insp. <- gsub("^CL[.]?\\s*FARALLONES$", "CL. FARALLONES", accidents_data$lugar_insp.)
+accidents_data$lugar_insp. <- gsub("^H[.]?U[.]?V[.]?$", "H.U.V.", accidents_data$lugar_insp.)
+accidents_data$lugar_insp. <- gsub("^H[.]?J[.]?P[.]?B[.]?$", "HOSPITAL J.P.B.", accidents_data$lugar_insp.)
+accidents_data$lugar_insp. <- gsub("^HOSPITAL J[.]?P[.]?B[.]?$", "HOSPITAL J.P.B.", accidents_data$lugar_insp.)
+accidents_data$lugar_insp. <- gsub("^H[.]?C[.]?H[.]?T[.]?$", "HOSPITAL C.H.T.", accidents_data$lugar_insp.)
+accidents_data$lugar_insp. <- gsub("^HOSPITAL C[.]?H[.]?T[.]?$", "HOSPITAL C.H.T.", accidents_data$lugar_insp.)
+accidents_data$lugar_insp. <- gsub("^H[.]? PRIMITIVO IGLESIAS$", "PRIMITIVO IGLESIAS", accidents_data$lugar_insp.)
+accidents_data$lugar_insp. <- gsub("^I[.]?S[.]?S[.]?$", "I.S.S.", accidents_data$lugar_insp.)
+
+!!!!!!!!!!!!!!!!!!!!!!!
+# TODO agrupar las VIAs
+
+unique(accidents_data$lugar_insp.)
+table(accidents_data$lugar_insp.)
+
+# Handling NA "lugar_insp."
+mode <- names(sort(table(accidents_data$lugar_insp.), decreasing = TRUE))[1]
+accidents_data$lugar_insp.[is.na(accidents_data$lugar_insp.)] <- mode # Impute the null value with the mode
 
 
 # Cleaning "condicion"
@@ -234,16 +326,242 @@ clean_condicion <- function(cond) {
   } else if (grepl("MOTO|MOTOCARRO", cond)) {
     return("MOTO")
   } else if (grepl("PEATON", cond)) {
-    return("PEATÓN")
+    return("PEATON")
   } else {
-    return("VEHÍCULO")  # All other categories are grouped as "VEHÍCULO"
+    return("VEHICULO")  # All other categories are grouped as "VEHICULO"
   }
 }
 
 # Apply the function to the 'condiccion' column
 accidents_data$condicion <- sapply(accidents_data$condicion, clean_condicion)
 
-# Check the unique values after cleaning
 unique(accidents_data$condicion)
 table(accidents_data$condicion)
+sum(is.na(accidents_data$condicion))
+
+
+# Checking duplicates values
+duplicated_rows <- accidents_data[duplicated(accidents_data), ]
+nrow(duplicated_rows) # 0 - No duplicate values
+
+
+# Viewing the final result of the dataset
+head(accidents_data)
+colSums(is.na(accidents_data))
+
+
+
+# Statistical analysis ----------------------------------------------------
+
+CV <- function(x) {
+  sd(x, na.rm = TRUE) / mean(x, na.rm = TRUE) * 100
+}
+
+accidents_data$comuna <- factor(accidents_data$comuna)
+
+table1 <- accidents_data %>%
+  tbl_summary(
+    include = c(mes_fallecimiento, mes_accidente, comuna, sexo, edad, 
+                fecha_accidente, fecha_fallecimiento, hora_fallecimiento, hora_accidente, 
+                dia_semana_fallecimiento, dia_semana_accidente, lugar_insp., condicion, vehiculos, ano),
+    statistic = list(
+      all_continuous() ~ "{mean} ({min}, {max}) {sd} {CV}",
+      all_categorical() ~ "{n} ({p}%)"
+    )
+  )
+
+table1
+
+# An error occurs because mathematical operations, such as division (/), are not defined for objects of type POSIXt,
+# since these variables represent dates and are not numeric. This error does not affect the execution of the rest of the code,
+# simply the Coefficient of Variation (CV) will not be calculated for these date type variables.
+
+# Visualizations ----------------------------------------------------------
+
+# Age Distribution
+p1 <- ggplot(accidents_data, aes(x = "", y = edad)) +
+  geom_boxplot(fill = "lightblue") +
+  theme_minimal() +
+  labs(title = "Age Distribution (Boxplot)", x = "", y = "Age")
+
+p2 <- ggplot(accidents_data, aes(x = edad)) +
+  geom_histogram(aes(y = ..density..), bins = 30, fill = "blue", alpha = 0.7) +
+  geom_density(color = "darkblue", size = 1) +
+  theme_minimal() +
+  labs(title = "Age Distribution (Histogram)", x = "Age", y = "Density")
+
+(p1 | p2)
+
+# Distribution of accidents by month with year comparison
+ggplot(accidents_data, aes(x = mes_accidente, fill = factor(ano))) +
+  geom_bar(position = "dodge") +
+  theme_minimal() +
+  labs(title = "Distribution of Accidents by Month",
+       x = "Month of Accident",
+       y = "Number of Accidents",
+       fill = "Year") +
+  scale_fill_manual(values = c("2009" = "blue", "2010" = "red"))
+
+# Distribution of accidents by comuna with year comparison
+ggplot(accidents_data, aes(x = as.factor(comuna), fill = factor(ano))) +
+  geom_bar(position = "dodge") +
+  theme_minimal() +
+  labs(title = "Distribution of Accidents by Comuna",
+       x = "Comuna",
+       y = "Number of Accidents",
+       fill = "Year") +
+  scale_fill_manual(values = c("2009" = "darkgreen", "2010" = "lightgreen"))
+
+# Distribution of accidents by gender with year comparison
+ggplot(accidents_data, aes(x = sexo, fill = factor(ano))) +
+  geom_bar(position = "dodge") +
+  theme_minimal() +
+  labs(title = "Distribution of Accidents by Gender",
+       x = "Gender",
+       y = "Number of Accidents",
+       fill = "Year") +
+  scale_fill_manual(values = c("2009" = "purple", "2010" = "pink"))
+
+# TODO poner los numeros del valor de las barras en el tope
+
+# Distribution of accidents by age group with year comparison
+ggplot(accidents_data, aes(x = edad_agrupada, fill = factor(ano))) +
+  geom_bar(position = "dodge") +
+  theme_minimal() +
+  labs(title = "Distribution of Accidents by Age Group",
+       x = "Age Group",
+       y = "Number of Accidents",
+       fill = "Year") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = c("2009" = "orange", "2010" = "yellow"))
+
+# Distribution of accidents by day of the week with year comparison
+ggplot(accidents_data, aes(x = dia_semana_accidente, fill = factor(ano))) +
+  geom_bar(position = "dodge") +
+  theme_minimal() +
+  labs(title = "Distribution of Accidents by Day of the Week",
+       x = "Day of the Week",
+       y = "Number of Accidents",
+       fill = "Year") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = c("2009" = "red", "2010" = "darkred"))
+
+
+# Distribution of accidents by hour of the day with year comparison
+
+accidents_data$hora_accidente <- as.POSIXct(accidents_data$hora_accidente, format = "%H:%M")
+accidents_data$hora_accidente_hora <- format(accidents_data$hora_accidente, "%H")
+
+ggplot(accidents_data, aes(x = hora_accidente_hora, fill = factor(ano))) +
+  geom_bar(position = "dodge", color = "black") +
+  theme_minimal() +
+  labs(title = "Distribution of Accidents by Hour of the Day",
+       x = "Hour of the Day",
+       y = "Number of Accidents",
+       fill = "Year") +
+  scale_fill_manual(values = c("2009" = "darkred", "2010" = "lightcoral"))
+
+
+# Distribution of accidents by condition of the person with year comparison
+ggplot(accidents_data, aes(x = condicion, fill = factor(ano))) +
+  geom_bar(position = "dodge") +
+  theme_minimal() +
+  labs(title = "Distribution of Accidents by Condition",
+       x = "Condition of the Person",
+       y = "Number of Accidents",
+       fill = "Year") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = c("2009" = "dodgerblue", "2010" = "lightblue"))
+
+# Homicides by traffic accidents, broken down by month and gender with year comparison
+ggplot(accidents_data, aes(x = mes_accidente, fill = sexo)) +
+  geom_bar(position = "dodge") +
+  facet_wrap(~ ano) +
+  theme_minimal() +
+  labs(title = "Homicides by Traffic Accidents in Cali - By Month and Gender",
+       x = "Month of Accident",
+       y = "Number of Homicides",
+       fill = "Gender") +
+  scale_fill_manual(values = c("M" = "lightblue", "F" = "pink"))
+
+# TODO ponerle división marcada entre las dos gráficas x año
+
+# Homicides by traffic accidents, broken down by age group and condition with year comparison
+ggplot(accidents_data, aes(x = edad_agrupada, fill = condicion)) +
+  geom_bar(position = "dodge") +
+  facet_wrap(~ ano) +
+  theme_minimal() +
+  labs(title = "Homicides by Traffic Accidents in Cali - By Age Group and Condition",
+       x = "Age Group",
+       y = "Number of Homicides",
+       fill = "Condition") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_brewer(palette = "Set3")
+
+# Boxplot of age by condition with year comparison
+ggplot(accidents_data, aes(x = condicion, y = edad, fill = factor(ano))) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Boxplot of Age by Condition",
+       x = "Condition of the Person",
+       y = "Age",
+       fill = "Year") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = c("2009" = "lightblue", "2010" = "darkblue"))
+
+
+
+!!!!!!!!!! Esta no me convence, se ve como desorganizada pero quería que tuvieramos más graficos aparte de barras y boxplots...
+# Pie chart of accidents by condition with year comparison
+
+accident_condition <- accidents_data %>%
+  group_by(ano, condicion) %>%
+  summarise(count = n(), .groups = 'drop') %>%
+  group_by(ano) %>% 
+  mutate(percentage = count / sum(count) * 100)
+
+ggplot(accident_condition, aes(x = "", y = count, fill = condicion)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar("y") +
+  facet_wrap(~ ano) +
+  theme_minimal() +
+  labs(title = "Pie Chart of Accidents by Condition",
+       fill = "Condition") +
+  theme(axis.text.x = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid = element_blank()) +
+  scale_fill_brewer(palette = "Set3") +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")),
+            position = position_stack(vjust = 0.5))
+
+
+
+
+# BORRAR AL FINAL -------------------------------------------------------------------------
+
+# Data imputation
+mode_profesion <- names(sort(table(accidents_data$profesion), decreasing = TRUE))[1]
+accidents_data$profesion[is.na(accidents_data$profesion)] <- mode_profesion
+
+unique(accidents_data$profesion)
+accidents_data$profesion[accidents_data$profesion %in% c("", "NA", "N/A", "NULL", "No aplica", "Desconocido")] <- NA
+
+colSums(is.na(accidents_data)) # There is more null data
+
+mode_profesion <- names(sort(table(accidents_data$profesion), decreasing = TRUE))[1]
+accidents_data$profesion[is.na(accidents_data$profesion)] <- mode_profesion
+
+
+# Data imputation
+accidents_data$edad <- as.numeric(as.character(accidents_data$edad))
+accidents_data$edad <- as.integer(accidents_data$edad)
+accidents_data$edad[is.na(accidents_data$edad)] <- mean(accidents_data$edad, na.rm = TRUE)
+colSums(is.na(accidents_data))
+
+
+
+
+
+
+
 
