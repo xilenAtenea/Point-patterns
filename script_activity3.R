@@ -8,7 +8,23 @@ to_be_loaded <- c("readxl",
                   "ggplot2",
                   "gtsummary",
                   "gridExtra",
-                  "lubridate"
+                  "lubridate",
+                  "aspace",
+                  #"adehabitat",
+                  "dplyr",
+                  "grDevices",
+                  "grid",
+                  "maptools", repos = "https://packagemanager.posit.co/cran/2023-10-13",
+                  "maps",
+                  "mapdata",
+                  "rgdal",
+                  "readxl",
+                  "spsurvey",
+                  "sp",
+                  "SpatialEpi",
+                  "spatstat",
+                  "spdep"
+                  
 )
 
 for (pck in to_be_loaded) {
@@ -26,6 +42,22 @@ library(ggplot2)
 library(gtsummary)
 library(gridExtra)
 library(lubridate)
+library(aspace)
+#library(adehabitat)
+#library(GeoXp)
+library(dplyr)
+library(grDevices)
+library(grid)
+library(maptools)
+library(maps)
+library(mapdata)
+#library(rgdal)
+library(readxl)
+library(spsurvey)
+library(sp)
+library(SpatialEpi)
+library(spatstat)
+library(spdep)
 
 # EDA -------------------------------------------------------------------------
 
@@ -392,6 +424,12 @@ p2 <- ggplot(accidents_data, aes(x = edad)) +
 
 (p1 | p2)
 
+
+# Define month order as factor
+accidents_data$mes_accidente <- factor(accidents_data$mes_accidente, 
+                                       levels = c("ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", 
+                                                  "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"))
+
 # Distribution of accidents by month with year comparison
 ggplot(accidents_data, aes(x = mes_accidente, fill = factor(ano))) +
   geom_bar(position = "dodge") +
@@ -440,6 +478,12 @@ ggplot(accidents_data, aes(x = edad_agrupada, fill = factor(ano))) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   scale_fill_manual(values = c("2009" = "orange", "2010" = "yellow"))
 
+
+# Define month order as factor
+accidents_data$dia_semana_accidente <- factor(accidents_data$dia_semana_accidente, 
+                                       levels = c("LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"))
+
+
 # Distribution of accidents by day of the week with year comparison
 ggplot(accidents_data, aes(x = dia_semana_accidente, fill = factor(ano))) +
   geom_bar(position = "dodge") +
@@ -449,7 +493,7 @@ ggplot(accidents_data, aes(x = dia_semana_accidente, fill = factor(ano))) +
        y = "Number of Accidents",
        fill = "Year") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  scale_fill_manual(values = c("2009" = "red", "2010" = "darkred"))
+  scale_fill_manual(values = c("2009" = "lightcoral", "2010" = "darkred"))
 
 
 # Distribution of accidents by hour of the day with year comparison
@@ -458,13 +502,13 @@ accidents_data$hora_accidente <- as.POSIXct(accidents_data$hora_accidente, forma
 accidents_data$hora_accidente_hora <- format(accidents_data$hora_accidente, "%H")
 
 ggplot(accidents_data, aes(x = hora_accidente_hora, fill = factor(ano))) +
-  geom_bar(position = "dodge", color = "black") +
+  geom_bar(position = "dodge") +
   theme_minimal() +
   labs(title = "Distribution of Accidents by Hour of the Day",
        x = "Hour of the Day",
        y = "Number of Accidents",
        fill = "Year") +
-  scale_fill_manual(values = c("2009" = "darkred", "2010" = "lightcoral"))
+  scale_fill_manual(values = c("2009" = "lightcoral", "2010" = "darkred"))
 
 
 # Distribution of accidents by condition of the person with year comparison
@@ -477,6 +521,7 @@ ggplot(accidents_data, aes(x = condicion, fill = factor(ano))) +
        fill = "Year") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   scale_fill_manual(values = c("2009" = "dodgerblue", "2010" = "lightblue"))
+
 
 # Homicides by traffic accidents, broken down by month and gender with year comparison
 ggplot(accidents_data, aes(x = mes_accidente, fill = sexo)) +
@@ -529,9 +574,9 @@ accident_condition <- accidents_data %>%
   mutate(percentage = count / sum(count) * 100)
 
 ggplot(accident_condition, aes(x = "", y = count, fill = condicion)) +
-  geom_bar(stat = "identity", width = 1) +
+  geom_bar(stat = "identity", width = 0.5) +
   coord_polar("y") +
-  facet_wrap(~ ano) +
+  facet_wrap(~ ano, scales = "free_y") +
   theme_minimal() +
   labs(title = "Pie Chart of Accidents by Condition",
        fill = "Condition") +
@@ -541,35 +586,4 @@ ggplot(accident_condition, aes(x = "", y = count, fill = condicion)) +
   scale_fill_brewer(palette = "Set3") +
   geom_text(aes(label = paste0(round(percentage, 1), "%")),
             position = position_stack(vjust = 0.5))
-
-
-
-
-# BORRAR AL FINAL -------------------------------------------------------------------------
-
-# Data imputation
-mode_profesion <- names(sort(table(accidents_data$profesion), decreasing = TRUE))[1]
-accidents_data$profesion[is.na(accidents_data$profesion)] <- mode_profesion
-
-unique(accidents_data$profesion)
-accidents_data$profesion[accidents_data$profesion %in% c("", "NA", "N/A", "NULL", "No aplica", "Desconocido")] <- NA
-
-colSums(is.na(accidents_data)) # There is more null data
-
-mode_profesion <- names(sort(table(accidents_data$profesion), decreasing = TRUE))[1]
-accidents_data$profesion[is.na(accidents_data$profesion)] <- mode_profesion
-
-
-# Data imputation
-accidents_data$edad <- as.numeric(as.character(accidents_data$edad))
-accidents_data$edad <- as.integer(accidents_data$edad)
-accidents_data$edad[is.na(accidents_data$edad)] <- mean(accidents_data$edad, na.rm = TRUE)
-colSums(is.na(accidents_data))
-
-
-
-
-
-
-
 
