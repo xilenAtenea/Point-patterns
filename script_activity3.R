@@ -155,7 +155,7 @@ unique(accidents_data$hora_fallecimiento) # Needs cleaning (time standarization)
 unique(accidents_data$hora_accidente) # Needs cleaning (time standarization) and null handling
 unique(accidents_data$dia_semana_fallecimiento)
 unique(accidents_data$dia_semana_accidente)  # Needs cleaning
-unique(accidents_data$lugar_insp.)
+unique(accidents_data$lugar_insp.) # Needs cleaning
 unique(accidents_data$condicion) # Needs cleaning (agrupation)
 unique(accidents_data$vehiculos)
 unique(accidents_data$ano)
@@ -481,7 +481,7 @@ ggplot(accidents_data, aes(x = edad_agrupada, fill = factor(ano))) +
 
 # Define month order as factor
 accidents_data$dia_semana_accidente <- factor(accidents_data$dia_semana_accidente, 
-                                       levels = c("LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"))
+                                              levels = c("LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"))
 
 
 # Distribution of accidents by day of the week with year comparison
@@ -498,8 +498,9 @@ ggplot(accidents_data, aes(x = dia_semana_accidente, fill = factor(ano))) +
 
 # Distribution of accidents by hour of the day with year comparison
 
-accidents_data$hora_accidente <- as.POSIXct(accidents_data$hora_accidente, format = "%H:%M")
-accidents_data$hora_accidente_hora <- format(accidents_data$hora_accidente, "%H")
+accidents_data$hora_accidente <- format(as.POSIXct(accidents_data$hora_accidente, format = "%H:%M"), "%H:%M")
+accidents_data$hora_accidente_hora <- format(as.POSIXct(accidents_data$hora_accidente, format = "%H:%M"), "%H")
+
 
 ggplot(accidents_data, aes(x = hora_accidente_hora, fill = factor(ano))) +
   geom_bar(position = "dodge") +
@@ -586,4 +587,61 @@ ggplot(accident_condition, aes(x = "", y = count, fill = condicion)) +
   scale_fill_brewer(palette = "Set3") +
   geom_text(aes(label = paste0(round(percentage, 1), "%")),
             position = position_stack(vjust = 0.5))
+
+
+# Analysis of point patterns by gender, age group and type of vehicle --------
+
+data_2009 <- accidents_data %>% filter(ano == 2009)
+data_2010 <- accidents_data %>% filter(ano == 2010)
+
+# Type of vehicle
+
+# 
+window <- owin(xrange = range(accidents_data$coordenada_x_km), 
+               yrange = range(accidents_data$coordenada_y_km))
+
+accidents_2009_ppp <- ppp(data_2009$coordenada_x_km, data_2009$coordenada_y_km, window = window, marks = data_2009$condicion)
+accidents_2010_ppp <- ppp(data_2010$coordenada_x_km, data_2010$coordenada_y_km, window = window, marks = data_2010$condicion)
+
+# 
+par(mfrow = c(1, 2))
+plot(accidents_2009_ppp, main = "Homicides by Traffic Accidents (2009)", cols = 1:3)
+plot(accidents_2010_ppp, main = "Homicides by Traffic Accidents (2010)", cols = 1:3)
+
+# 
+quadrat_test_2009 <- quadrat.test(accidents_2009_ppp, nx = 4, ny = 4)
+quadrat_test_2010 <- quadrat.test(accidents_2010_ppp, nx = 4, ny = 4)
+
+# 
+density_2009 <- density(accidents_2009_ppp, sigma = bw.diggle)
+density_2010 <- density(accidents_2010_ppp, sigma = bw.diggle)
+
+# 
+par(mfrow = c(1, 2))
+plot(density_2009, main = "Density of Homicides (2009)")
+plot(accidents_2009_ppp, add = TRUE)
+plot(density_2010, main = "Density of Homicides (2010)")
+plot(accidents_2010_ppp, add = TRUE)
+
+K_ripley_2009 <- Kest(accidents_2009_ppp)
+K_ripley_2010 <- Kest(accidents_2010_ppp)
+
+# 
+par(mfrow = c(1, 2))
+plot(K_ripley_2009, main = "K de Ripley - 2009")
+plot(K_ripley_2010, main = "K de Ripley - 2010")
+
+#  - 2009
+coords_2009 <- cbind(data_2009$coordenada_x_km, data_2009$coordenada_y_km)
+knn_2009 <- knearneigh(coords_2009, k = 4)
+nb_2009 <- knn2nb(knn_2009)
+listw_2009 <- nb2listw(nb_2009, style = "W")
+
+# Moran Test 2009
+moran_test_2009 <- moran.test(as.numeric(accidents_2009_ppp$marks), listw_2009)
+print(moran_test_2009)
+
+
+#  - 2010
+# Moran Test 2010
 
