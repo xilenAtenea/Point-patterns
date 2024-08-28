@@ -197,6 +197,8 @@ p2 <- ggplot(accidents_data_imputed, aes(x = edad)) +
 
 (p1 | p2) # plot histograms side to side
 
+# TODO poner los histogramas uno sobre otro.
+
 accidents_data <- accidents_data_imputed # replace old dataframe
 accidents_data <- accidents_data %>% select(-c("edad_imp")) # Droping unnecessary column
 
@@ -218,6 +220,10 @@ table(accidents_data$edad_agrupada)
 
 
 # Cleaning "hora_fallecimiento"
+
+# TODO verificar con el excel
+
+
 unique(accidents_data$hora_fallecimiento)
 
 convert_time <- function(fraction_of_day) {
@@ -277,6 +283,9 @@ unique(accidents_data$hora_fallecimiento)
 
 
 # Cleaning "hora_accidente"
+
+# TODO intentar leer la variables de hora como texto para evitar esta limpieza y tantos NA
+
 unique(accidents_data$hora_accidente)
 
 convert_fraction_to_hhmm <- function(fraction) {
@@ -392,7 +401,7 @@ CV <- function(x) {
 accidents_data$comuna <- factor(accidents_data$comuna)
 
 table1 <- accidents_data %>%
-  tbl_summary(
+  tbl_summary( by = as.factor(ano),
     include = c(mes_fallecimiento, mes_accidente, comuna, sexo, edad, 
                 fecha_accidente, fecha_fallecimiento, hora_fallecimiento, hora_accidente, 
                 dia_semana_fallecimiento, dia_semana_accidente, lugar_insp., condicion, vehiculos, ano),
@@ -407,6 +416,9 @@ table1
 # An error occurs because mathematical operations, such as division (/), are not defined for objects of type POSIXt,
 # since these variables represent dates and are not numeric. This error does not affect the execution of the rest of the code,
 # simply the Coefficient of Variation (CV) will not be calculated for these date type variables.
+
+# TODO Hacer una tabla con condicion, dia de la semana, sexo, edad agrupada y hora - separado por año 
+# TODO para separarla por año usar el argumento "by"
 
 # Visualizations ----------------------------------------------------------
 
@@ -438,7 +450,7 @@ ggplot(accidents_data, aes(x = mes_accidente, fill = factor(ano))) +
        x = "Month of Accident",
        y = "Number of Accidents",
        fill = "Year") +
-  scale_fill_manual(values = c("2009" = "blue", "2010" = "red"))+
+  scale_fill_manual(values = c("2009" = "lightblue", "2010" = "pink"))+
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1)
   )
@@ -466,6 +478,8 @@ ggplot(accidents_data, aes(x = sexo, fill = factor(ano))) +
             position = position_dodge(width = 0.9), 
             vjust = -0.5, 
             color = "black")
+
+# TODO rectificar gráficar. Poner año en el eje x y sexo en el legend
 
 # Distribution of accidents by age group with year comparison
 ggplot(accidents_data, aes(x = edad_agrupada, fill = factor(ano))) +
@@ -588,13 +602,14 @@ ggplot(accident_condition, aes(x = "", y = count, fill = condicion)) +
   geom_text(aes(label = paste0(round(percentage, 1), "%")),
             position = position_stack(vjust = 0.5))
 
+# TODO quitar grafica de torta
 
 # Analysis of point patterns by gender, age group and type of vehicle --------
 
 data_2009 <- accidents_data %>% filter(ano == 2009)
 data_2010 <- accidents_data %>% filter(ano == 2010)
 
-# Type of vehicle
+# Type of vehicle ("condicion")
 
 # Point pattern object (ppp) for 2009 and 2010
 window <- owin(xrange = range(accidents_data$coordenada_x_km), 
@@ -607,6 +622,8 @@ accidents_2010_ppp <- ppp(data_2010$coordenada_x_km, data_2010$coordenada_y_km, 
 par(mfrow = c(1, 2))
 plot(accidents_2009_ppp, main = "Homicides by Traffic Accidents (2009)", cols = 1:3)
 plot(accidents_2010_ppp, main = "Homicides by Traffic Accidents (2010)", cols = 1:3)
+
+# TODO ponerle borde
 
 # Quadrant analysis
 quadrat_test_2009 <- quadrat.test(accidents_2009_ppp, nx = 4, ny = 4)
@@ -622,9 +639,9 @@ density_2010 <- density(accidents_2010_ppp, sigma = bw.diggle)
 # Density plots
 par(mfrow = c(1, 2))
 plot(density_2009, main = "Density of Homicides (2009)")
-plot(accidents_2009_ppp, add = TRUE)
+# plot(accidents_2009_ppp, add = TRUE)
 plot(density_2010, main = "Density of Homicides (2010)")
-plot(accidents_2010_ppp, add = TRUE)
+# plot(accidents_2010_ppp, add = TRUE)
 
 
 K_ripley_2009 <- Kest(accidents_2009_ppp)
@@ -633,7 +650,7 @@ K_ripley_2010 <- Kest(accidents_2010_ppp)
 # Ripley's K function
 par(mfrow = c(1, 2))
 plot(K_ripley_2009, main = "Ripley's K function - 2009")
-plot(K_ripley_2010, main = "Ripley's K function - 2010")
+plot(K_ripley_2010, main = "Ripley's K function - 2010") # The blue mark is the reference
 
 # Create matrix of spatial weights - 2009
 coords_2009 <- cbind(data_2009$coordenada_x_km, data_2009$coordenada_y_km)
@@ -651,4 +668,3 @@ print(moran_test_2009)
 
 #  Create matrix of spatial weights - 2010
 # Moran Test 2010
-
