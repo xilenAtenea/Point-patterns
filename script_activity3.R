@@ -326,6 +326,11 @@ unique(accidents_data$condicion)
 table(accidents_data$condicion)
 sum(is.na(accidents_data$condicion))
 
+# Add new column of case count per commune
+accidents_data <- accidents_data %>%
+  group_by(comuna) %>%
+  mutate(casos = n()) %>%
+  ungroup()
 
 # Checking duplicates values
 duplicated_rows <- accidents_data[duplicated(accidents_data), ]
@@ -336,6 +341,15 @@ nrow(duplicated_rows) # 0 - No duplicate values
 head(accidents_data)
 colSums(is.na(accidents_data))
 
+
+# Define month order 
+accidents_data$dia_semana_accidente <- factor(accidents_data$dia_semana_accidente,
+                                              levels = c("LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"))
+
+# Define month order
+accidents_data$mes_accidente <- factor(accidents_data$mes_accidente,
+                                       levels = c("ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
+                                                  "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"))
 
 
 # Statistical analysis ----------------------------------------------------
@@ -376,11 +390,6 @@ p2 <- ggplot(accidents_data, aes(x = edad)) +
 
 (p1 | p2)
 
-
-# Define month order as factor
-accidents_data$mes_accidente <- factor(accidents_data$mes_accidente,
-                                       levels = c("ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
-                                                  "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"))
 
 # Distribution of accidents by month with year comparison
 ggplot(accidents_data, aes(x = mes_accidente, fill = factor(ano))) +
@@ -429,10 +438,6 @@ ggplot(accidents_data, aes(x = edad_agrupada, fill = factor(ano))) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   scale_fill_manual(values = c("2009" = "orange", "2010" = "yellow"))
 
-
-# Define month order as factor
-accidents_data$dia_semana_accidente <- factor(accidents_data$dia_semana_accidente,
-                                              levels = c("LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"))
 
 # Distribution of accidents by day of the week with year comparison
 ggplot(accidents_data, aes(x = dia_semana_accidente, fill = factor(ano))) +
@@ -521,35 +526,59 @@ ggplot(accidents_data, aes(x = condicion, y = edad, fill = factor(ano))) +
   scale_fill_manual(values = c("2009" = "lightblue", "2010" = "royalblue3"))
 
 
-
-
 # Analysis of point patterns by gender, age group and type of vehicle --------
 
+
+# transforming coords data
+options(digits=8)
+accidents_data$coordenada_x_km <- as.numeric(gsub(",", ".", accidents_data$coordenada_x_km))
+accidents_data$coordenada_y_km <- as.numeric(gsub(",", ".", accidents_data$coordenada_y_km))
+
+
+# Map graphic
+cali_map<-readShapePoly("Mapas/mapa_km.shp") 
+
+par(mfrow = c(1, 1))
+plot(cali_map, axes=T)
+points(accidents_data$coordenada_x_km, accidents_data$coordenada_y_km, pch=19, cex=0.5)
+
+#Grafico del borde
+
+# filter data
 data_2009 <- accidents_data %>% filter(ano == 2009)
 data_2010 <- accidents_data %>% filter(ano == 2010)
 
-# Type of vehicle ("condicion")
 
-# Point pattern object (ppp) for 2009 and 2010
-window <- owin(xrange = range(accidents_data$coordenada_x_km),
-               yrange = range(accidents_data$coordenada_y_km))
+# generate border
+map_border<-readShapePoly("Mapas/borde_km.shp")
+#plot(map_border)
+borde_owin<-as(map_border, "owin")
+#class(borde_owin)
 
-accidents_2009_ppp <- ppp(data_2009$coordenada_x_km, data_2009$coordenada_y_km, window = window, marks = data_2009$condicion)
-accidents_2010_ppp <- ppp(data_2010$coordenada_x_km, data_2010$coordenada_y_km, window = window, marks = data_2010$condicion)
+# ppp objects
+# accidents_2009_ppp <- ppp(data_2009$coordenada_x_km, data_2009$coordenada_y_km, window = borde_poly)
+# accidents_2010_ppp <- ppp(data_2010$coordenada_x_km, data_2010$coordenada_y_km, window = borde_poly)
 
-# Initial visualization of point patterns
+accidents_2009_ppp <- ppp(
+  x = data_2009$coordenada_x_km,
+  y = data_2009$coordenada_y_km,
+  marks = data_2009[, c("sexo", "edad_agrupada", "condicion")],
+  window = borde_owin)
+  
+accidents_2010_ppp <- ppp(
+  x = data_2010$coordenada_x_km,
+  y = data_2010$coordenada_y_km,
+  marks = data_2010[, c("sexo", "edad_agrupada", "condicion")],
+  window = borde_owin)
+
+# Density graphic
 par(mfrow = c(1, 2))
-plot(accidents_2009_ppp, main = "Homicides by Traffic Accidents (2009)", cols = 1:3)
-plot(accidents_2010_ppp, main = "Homicides by Traffic Accidents (2010)", cols = 1:3)
+image(density(accidents_2009_ppp), xlab="", ylab="", main="Density of Homicides (2009)")
+plot(map_border, add=T, border=1)
 
-# TODO ponerle borde
+image(density(accidents_2010_ppp), xlab="", ylab="", main="Density of Homicides (2010)")
+plot(map_border, add=T, border=1)
 
-# Quadrant analysis
-quadrat_test_2009 <- quadrat.test(accidents_2009_ppp, nx = 4, ny = 4)
-quadrat_test_2009
-
-quadrat_test_2010 <- quadrat.test(accidents_2010_ppp, nx = 4, ny = 4)
-quadrat_test_2010
 
 # Density estimation using Kernel
 density_2009 <- density(accidents_2009_ppp, sigma = bw.diggle)
@@ -562,28 +591,131 @@ plot(density_2009, main = "Density of Homicides (2009)")
 plot(density_2010, main = "Density of Homicides (2010)")
 # plot(accidents_2010_ppp, add = TRUE)
 
+# K_gender_2009 <- Kest(accidents_2009_ppp, by = "sexo")
+# K_age_2009 <- Kest(accidents_2009_ppp, by = "edad_agrupada")
+# K_cond_2009 <- Kest(accidents_2009_ppp, by = "condicion")
+# 
+# K_gender_2010 <- Kest(accidents_2010_ppp, by = "sexo")
+# K_age_2010 <- Kest(accidents_2010_ppp, by = "edad_agrupada")
+# K_cond_2010 <- Kest(accidents_2010_ppp, by = "condicion")
+# 
+# par(mfrow = c(2, 3))
+# plot(K_gender_2009, main = "Ripley's K Function per Gender") 
+# plot(K_age_2009, main = "Ripley's K Function per Age Group")  
+# plot(K_cond_2009, main = "Ripley's K Function per Condition") 
+# 
+# plot(K_gender_2010, main = "Ripley's K Function per Gender") 
+# plot(K_age_2010, main = "Ripley's K Function per Age Group") 
+# plot(K_cond_2010, main = "Ripley's K Function per Condition")
+
+
+# Ripley's K function
 
 K_ripley_2009 <- Kest(accidents_2009_ppp)
 K_ripley_2010 <- Kest(accidents_2010_ppp)
 
-# Ripley's K function
 par(mfrow = c(1, 2))
 plot(K_ripley_2009, main = "Ripley's K function - 2009")
 plot(K_ripley_2010, main = "Ripley's K function - 2010") # The blue mark is the reference
 
-# Create matrix of spatial weights - 2009
-coords_2009 <- cbind(data_2009$coordenada_x_km, data_2009$coordenada_y_km)
-knn_2009 <- knearneigh(coords_2009, k = 4)
-nb_2009 <- knn2nb(knn_2009)
-listw_2009 <- nb2listw(nb_2009, style = "W")
+
+# Quadrant analysis
+
+quadrat_test_2009 <- quadrat.test(accidents_2009_ppp, nx = 4, ny = 4) # p-value = 2.7748e-14
+quadrat_test_2009
+
+quadrat_test_2010 <- quadrat.test(accidents_2010_ppp, nx = 4, ny = 4) # p-value = 1.3277e-06
+quadrat_test_2010
 
 
-sum(is.na(accidents_2009_ppp$marks))
+# Spatial autocorrelation with Moran index for 2009
+coord_total <-cbind(data_2009$coordenada_x_km, data_2009$coordenada_y_km) # form a matrix of data points
+coord_knn<-knearneigh(coord_total, k=5) # knn of 4 nearest points to calculate autocorrelation
 
-# Moran Test 2009
-moran_test_2009 <- moran.test(as.numeric(accidents_2009_ppp$marks), listw_2009)
-print(moran_test_2009)
+coord_knn2<-knn2nb(coord_knn, row.names = NULL, sym = FALSE) # turn knn list into knn object
+coord_nb2<-nb2listw(coord_knn2, glist=NULL, style="W", zero.policy=NULL) # weighted list for moran index calculation
+#moran.test(coord_total, coord_nb2)
+
+analysis_var <- data_2009$casos # variable to analyze
+
+moran.test(analysis_var, coord_nb2) # p-value < 2.22e-16
 
 
-#  Create matrix of spatial weights - 2010
-# Moran Test 2010
+# Spatial autocorrelation with Moran index for 2010
+coord_total <-cbind(data_2010$coordenada_x_km, data_2010$coordenada_y_km) # form a matrix of data points
+coord_knn<-knearneigh(coord_total, k=4) # knn of 4 nearest points to calculate autocorrelation
+
+coord_knn2<-knn2nb(coord_knn, row.names = NULL, sym = FALSE) # turn knn list into knn object
+coord_nb2<-nb2listw(coord_knn2, glist=NULL, style="W", zero.policy=NULL) # weighted list for moran index calculation
+#moran.test(coord_total, coord_nb2)
+
+variable_a_analizar <- data_2010$casos # variable to analyze
+
+moran.test(variable_a_analizar, coord_nb2) #p-value < 2.22e-16
+
+
+
+# variables analysis------------------------
+
+# GENDER ANALYSIS
+gender_2009_ppp <- ppp(data_2009$coordenada_x_km, data_2009$coordenada_y_km,
+                       window = borde_poly, marks = data_2009$sexo)
+                  
+gender_2010_ppp <- ppp(data_2010$coordenada_x_km, data_2010$coordenada_y_km,
+                       window = borde_poly, marks = data_2010$sexo)
+
+# map per categories
+par(mfrow = c(1, 2))
+plot(gender_2009_ppp, main = "Homicides by Traffic Accidents per Gender (2009)", cols = 1:3)
+plot(gender_2010_ppp, main = "Homicides by Traffic Accidents per Gender (2010)", cols = 1:3)
+
+
+
+# AGE
+age_2009_ppp <- ppp(data_2009$coordenada_x_km, 
+                    data_2009$coordenada_y_km, 
+                    window = borde_poly, 
+                    marks = data_2009$edad_agrupada)
+
+age_2010_ppp <- ppp(data_2010$coordenada_x_km,
+                    data_2010$coordenada_y_km, 
+                    window = borde_poly, 
+                    marks = data_2010$edad_agrupada)
+
+# map per categories
+par(mfrow = c(1, 2))
+plot(age_2009_ppp, main = "Homicides by Traffic Accidents per Age Group (2009)", cols = 1:3)
+plot(age_2009_ppp, main = "Homicides by Traffic Accidents per Age Group (2010)", cols = 1:3)
+
+
+# VEHICLE
+condition_2009_ppp <- ppp(data_2009$coordenada_x_km,
+                          data_2009$coordenada_y_km,
+                          window = borde_poly, 
+                          marks = data_2009$condicion)
+
+condition_2010_ppp <- ppp(data_2010$coordenada_x_km,
+                          data_2010$coordenada_y_km,
+                          window = borde_poly, 
+                          marks = data_2010$condicion)
+
+# map per categories
+par(mfrow = c(1, 2))
+plot(condition_2009_ppp, main = "Homicides by Traffic Accidents per Condition (2009)", cols = 1:3)
+plot(condition_2010_ppp, main = "Homicides by Traffic Accidents per Condition (2010)", cols = 1:3)
+
+
+
+# Model fit --------------
+
+accidents_ppp <- ppp(
+  x = accidents_data$coordenada_x_km,
+  y = accidents_data$coordenada_y_km,
+  window = borde_owin)
+
+attach(accidents_ppp)
+model_p <- ppm(accidents_ppp ~ sexo + edad_agrupada + condicion)
+summary(model_p)
+
+# Plot estimated intensity
+plot(predict(modelo_poisson, type = "trend"), main = "Intensidad Estimada")
