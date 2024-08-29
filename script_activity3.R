@@ -326,11 +326,6 @@ unique(accidents_data$condicion)
 table(accidents_data$condicion)
 sum(is.na(accidents_data$condicion))
 
-# Add new column of case count per commune
-accidents_data <- accidents_data %>%
-  group_by(comuna) %>%
-  mutate(casos = n()) %>%
-  ungroup()
 
 # Checking duplicates values
 duplicated_rows <- accidents_data[duplicated(accidents_data), ]
@@ -340,16 +335,7 @@ nrow(duplicated_rows) # 0 - No duplicate values
 # Viewing the final result of the dataset
 head(accidents_data)
 colSums(is.na(accidents_data))
-
-
-# Define month order 
-accidents_data$dia_semana_accidente <- factor(accidents_data$dia_semana_accidente,
-                                              levels = c("LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"))
-
-# Define month order
-accidents_data$mes_accidente <- factor(accidents_data$mes_accidente,
-                                       levels = c("ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
-                                                  "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"))
+dim(accidents_data)
 
 
 # Statistical analysis ----------------------------------------------------
@@ -390,6 +376,11 @@ p2 <- ggplot(accidents_data, aes(x = edad)) +
 
 (p1 | p2)
 
+
+# Define month order as factor
+accidents_data$mes_accidente <- factor(accidents_data$mes_accidente,
+                                       levels = c("ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
+                                                  "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"))
 
 # Distribution of accidents by month with year comparison
 ggplot(accidents_data, aes(x = mes_accidente, fill = factor(ano))) +
@@ -438,6 +429,10 @@ ggplot(accidents_data, aes(x = edad_agrupada, fill = factor(ano))) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   scale_fill_manual(values = c("2009" = "orange", "2010" = "yellow"))
 
+
+# Define month order as factor
+accidents_data$dia_semana_accidente <- factor(accidents_data$dia_semana_accidente,
+                                              levels = c("LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"))
 
 # Distribution of accidents by day of the week with year comparison
 ggplot(accidents_data, aes(x = dia_semana_accidente, fill = factor(ano))) +
@@ -497,6 +492,22 @@ ggplot(accidents_data, aes(x = mes_accidente, fill = sexo)) +
     axis.text.x = element_text(angle = 45, hjust = 1)
   )
 
+# Homicides by traffic accidents, broken down by condition and gender with year comparison
+ggplot(accidents_data, aes(x = condicion, fill = sexo)) +
+  geom_bar(position = "dodge") +
+  facet_wrap(~ ano, scales = "free_x") +
+  theme_minimal() +
+  labs(x = "Condition of the Person",
+       y = "Number of Homicides",
+       fill = "Gender") +
+  scale_fill_manual(values = c("M" = "royalblue", "F" = "lightpink")) +
+  theme(
+    panel.spacing = unit(2, "lines"),
+    axis.line = element_line(color = "grey"),
+    panel.border = element_rect(color = "grey", fill = NA, size = 0.5),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
 
 # Homicides by traffic accidents, broken down by age group and condition with year comparison
 ggplot(accidents_data, aes(x = edad_agrupada, fill = condicion)) +
@@ -524,6 +535,8 @@ ggplot(accidents_data, aes(x = condicion, y = edad, fill = factor(ano))) +
        fill = "Year") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   scale_fill_manual(values = c("2009" = "lightblue", "2010" = "royalblue3"))
+
+
 
 
 # Analysis of point patterns by gender, age group and type of vehicle --------
@@ -564,7 +577,7 @@ accidents_2009_ppp <- ppp(
   y = data_2009$coordenada_y_km,
   marks = data_2009[, c("sexo", "edad_agrupada", "condicion")],
   window = borde_owin)
-  
+
 accidents_2010_ppp <- ppp(
   x = data_2010$coordenada_x_km,
   y = data_2010$coordenada_y_km,
@@ -660,7 +673,7 @@ moran.test(variable_a_analizar, coord_nb2) #p-value < 2.22e-16
 # GENDER ANALYSIS
 gender_2009_ppp <- ppp(data_2009$coordenada_x_km, data_2009$coordenada_y_km,
                        window = borde_poly, marks = data_2009$sexo)
-                  
+
 gender_2010_ppp <- ppp(data_2010$coordenada_x_km, data_2010$coordenada_y_km,
                        window = borde_poly, marks = data_2010$sexo)
 
