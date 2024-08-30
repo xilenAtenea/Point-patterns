@@ -603,7 +603,7 @@ quadrat_test_2009
 quadrat_test_2010 <- quadrat.test(accidents_2010_ppp, nx = 4, ny = 4) # p-value = 1.3277e-06
 quadrat_test_2010
 
-
+# plottear quadrats -> elegir numero de cuadrantes
 
 
 # variables exploratory analysis------------------------
@@ -700,10 +700,12 @@ density_18_26_2010 <- density(age_2010_ppp[age_2010_ppp$marks == "18-26"], sigma
 density_27_59_2010 <- density(age_2010_ppp[age_2010_ppp$marks == "27-59"], sigma = bw.diggle)
 density_60_plus_2010 <- density(age_2010_ppp[age_2010_ppp$marks == "60+"], sigma = bw.diggle)
 
-par(mfrow = c(2, 5))
+# TODO Exportarla:
+par(mfrow = c(5, 2))
 
 # Gráficos para 2009
-plot(density_0_11_2009, main = "Density of Homicides (0-11 years, 2009)")
+# "Densidad de accidentes de tránsito fatales"
+plot(density_0_11_2009, main = "0-11 years, 2009") # TODO acortar titulos
 plot(map_border, add = TRUE)
 plot(density_12_18_2009, main = "Density of Homicides (12-18 years, 2009)")
 plot(map_border, add = TRUE)
@@ -715,7 +717,7 @@ plot(density_60_plus_2009, main = "Density of Homicides (60+ years, 2009)")
 plot(map_border, add = TRUE)
 
 # Gráficos para 2010
-#plot(density_0_11_2010, main = "Density of Homicides (0-11 years, 2010)")
+plot(density_0_11_2010, main = "Density of Homicides (0-11 years, 2010)")
 #plot(map_border, add = TRUE)
 plot(density_12_18_2010, main = "Density of Homicides (12-18 years, 2010)")
 plot(map_border, add = TRUE)
@@ -753,14 +755,59 @@ plot(condition_2010_ppp, main = "Homicides by Traffic Accidents per Condition (2
 # Ripley's K function
 
 
-# Model fit --------------
 
-accidents_ppp <- ppp(
-  x = accidents_data$coordenada_x_km,
-  y = accidents_data$coordenada_y_km,
-  window = borde_owin)
 
-attach(accidents_ppp)
+# Model fit (Marked point patterns)--------------
+
+
+# Create point patterns for 2009 and 2010
+accidents_2009_ppp <- ppp(x = data_2009$coordenada_x_km, 
+                          y = data_2009$coordenada_y_km, 
+                          window = borde_owin,
+                          marks = data_2009$sexo) 
+
+plot(accidents_2009_ppp)
+
+!!!  
+  # Tocó poner las tres variables como marcas porque si se ponia una sola ya no 
+  # era multitype y no se podía hacer el modelo despues. -> "data pattern is not multitype" 
+
+accidents_2010_ppp <- ppp(x = data_2010$coordenada_x_km, 
+                          y = data_2010$coordenada_y_km, 
+                          window = borde_owin)
+plot(accidents_2010_ppp)
+
+# Create quadrature scheme
+Q_2009 <- quadscheme(data = accidents_2009_ppp)
+Q_2010 <- quadscheme(data = accidents_2010_ppp)
+
+# The gridding scheme allows fitting spatial models 
+# by combining observed points with fictitious points, 
+# which helps to assess how covariates (such as sex, 
+# grouped age or condition) affect the spatial distribution of events in the study area.
+
+
+
+
+# -------------------------------------------------------------------------
+
+### GENDER  2009###
+Q <- quadscheme(data=accidents_2009_ppp)
+# df <- data.frame(Sexo = c(data_2009$sexo))
+df <- data.frame(Sexo = c(data_2009$sexo, rep(NA, n.quad(Q) - nrow(data_2009))))
+
+!!! 
+  # Se puso rep NA porque el tamaño del df no era el mismo que de Q, así que no permitia hacer el modelo.
+
+ppm(accidents_2009_ppp, ~ accidents_2009_ppp$marks, Poisson(), covariates=df)
+  # Se separaría cada df y luego se harían 6 modelos.
+
+### GENDER  2010###
+
+
+
+# borrar ------------------------------------------------------------------
+
 model_p <- ppm(accidents_ppp ~ sexo + edad_agrupada + condicion)
 summary(model_p)
 
