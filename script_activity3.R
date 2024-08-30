@@ -543,12 +543,27 @@ ggplot(accidents_data, aes(x = condicion, y = edad, fill = factor(ano))) +
 
 # Analysis of point patterns by gender, age group and type of vehicle --------
 
-
 # transforming coords data
 options(digits=8)
 accidents_data$coordenada_x_km <- as.numeric(gsub(",", ".", accidents_data$coordenada_x_km))
 accidents_data$coordenada_y_km <- as.numeric(gsub(",", ".", accidents_data$coordenada_y_km))
 
+# trasforming age 
+accidents_data$edad_agrupada <- cut(accidents_data$edad,
+                       breaks = c(-Inf, 11, 18, 26, 59, Inf),
+                       labels = c("0-11",    # infancia
+                                  "12-18", # adolescencia
+                                  "18-26", # juventud
+                                  "27-59",  # adultez
+                                  "60+"),    # persona mayor
+                       right = TRUE)  # right=TRUE includes upper limit
+
+# filter data
+data_2009 <- accidents_data %>% filter(ano == 2009)
+data_2010 <- accidents_data %>% filter(ano == 2010)
+
+
+# Spatial EDA
 
 # Map graphic
 cali_map<-readShapePoly("Mapas/mapa_km.shp") 
@@ -556,13 +571,6 @@ cali_map<-readShapePoly("Mapas/mapa_km.shp")
 par(mfrow = c(1, 1))
 plot(cali_map, axes=T)
 points(accidents_data$coordenada_x_km, accidents_data$coordenada_y_km, pch=19, cex=0.5)
-
-#Grafico del borde
-
-# filter data
-data_2009 <- accidents_data %>% filter(ano == 2009)
-data_2010 <- accidents_data %>% filter(ano == 2010)
-
 
 # generate border
 map_border<-readShapePoly("Mapas/borde_km.shp")
@@ -579,59 +587,12 @@ accidents_2009_ppp <- ppp(
   y = data_2009$coordenada_y_km,
   marks = data_2009[, c("sexo", "edad_agrupada", "condicion")],
   window = borde_owin)
-
+  
 accidents_2010_ppp <- ppp(
   x = data_2010$coordenada_x_km,
   y = data_2010$coordenada_y_km,
   marks = data_2010[, c("sexo", "edad_agrupada", "condicion")],
   window = borde_owin)
-
-# Density graphic
-par(mfrow = c(1, 2))
-image(density(accidents_2009_ppp), xlab="", ylab="", main="Density of Homicides (2009)")
-plot(map_border, add=T, border=1)
-
-image(density(accidents_2010_ppp), xlab="", ylab="", main="Density of Homicides (2010)")
-plot(map_border, add=T, border=1)
-
-
-# Density estimation using Kernel
-density_2009 <- density(accidents_2009_ppp, sigma = bw.diggle)
-density_2010 <- density(accidents_2010_ppp, sigma = bw.diggle)
-
-# Density plots
-par(mfrow = c(1, 2))
-plot(density_2009, main = "Density of Homicides (2009)")
-# plot(accidents_2009_ppp, add = TRUE)
-plot(density_2010, main = "Density of Homicides (2010)")
-# plot(accidents_2010_ppp, add = TRUE)
-
-# K_gender_2009 <- Kest(accidents_2009_ppp, by = "sexo")
-# K_age_2009 <- Kest(accidents_2009_ppp, by = "edad_agrupada")
-# K_cond_2009 <- Kest(accidents_2009_ppp, by = "condicion")
-# 
-# K_gender_2010 <- Kest(accidents_2010_ppp, by = "sexo")
-# K_age_2010 <- Kest(accidents_2010_ppp, by = "edad_agrupada")
-# K_cond_2010 <- Kest(accidents_2010_ppp, by = "condicion")
-# 
-# par(mfrow = c(2, 3))
-# plot(K_gender_2009, main = "Ripley's K Function per Gender") 
-# plot(K_age_2009, main = "Ripley's K Function per Age Group")  
-# plot(K_cond_2009, main = "Ripley's K Function per Condition") 
-# 
-# plot(K_gender_2010, main = "Ripley's K Function per Gender") 
-# plot(K_age_2010, main = "Ripley's K Function per Age Group") 
-# plot(K_cond_2010, main = "Ripley's K Function per Condition")
-
-
-# Ripley's K function
-
-K_ripley_2009 <- Kest(accidents_2009_ppp)
-K_ripley_2010 <- Kest(accidents_2010_ppp)
-
-par(mfrow = c(1, 2))
-plot(K_ripley_2009, main = "Ripley's K function - 2009")
-plot(K_ripley_2010, main = "Ripley's K function - 2010") # The blue mark is the reference
 
 
 # Quadrant analysis
@@ -643,64 +604,132 @@ quadrat_test_2010 <- quadrat.test(accidents_2010_ppp, nx = 4, ny = 4) # p-value 
 quadrat_test_2010
 
 
-# Spatial autocorrelation with Moran index for 2009
-coord_total <-cbind(data_2009$coordenada_x_km, data_2009$coordenada_y_km) # form a matrix of data points
-coord_knn<-knearneigh(coord_total, k=5) # knn of 4 nearest points to calculate autocorrelation
-
-coord_knn2<-knn2nb(coord_knn, row.names = NULL, sym = FALSE) # turn knn list into knn object
-coord_nb2<-nb2listw(coord_knn2, glist=NULL, style="W", zero.policy=NULL) # weighted list for moran index calculation
-#moran.test(coord_total, coord_nb2)
-
-analysis_var <- data_2009$casos # variable to analyze
-
-moran.test(analysis_var, coord_nb2) # p-value < 2.22e-16
 
 
-# Spatial autocorrelation with Moran index for 2010
-coord_total <-cbind(data_2010$coordenada_x_km, data_2010$coordenada_y_km) # form a matrix of data points
-coord_knn<-knearneigh(coord_total, k=4) # knn of 4 nearest points to calculate autocorrelation
-
-coord_knn2<-knn2nb(coord_knn, row.names = NULL, sym = FALSE) # turn knn list into knn object
-coord_nb2<-nb2listw(coord_knn2, glist=NULL, style="W", zero.policy=NULL) # weighted list for moran index calculation
-#moran.test(coord_total, coord_nb2)
-
-variable_a_analizar <- data_2010$casos # variable to analyze
-
-moran.test(variable_a_analizar, coord_nb2) #p-value < 2.22e-16
-
-
-
-# variables analysis------------------------
+# variables exploratory analysis------------------------
 
 # GENDER ANALYSIS
 gender_2009_ppp <- ppp(data_2009$coordenada_x_km, data_2009$coordenada_y_km,
-                       window = borde_poly, marks = data_2009$sexo)
-
+                       window = borde_owin, marks = data_2009$sexo)
+                  
 gender_2010_ppp <- ppp(data_2010$coordenada_x_km, data_2010$coordenada_y_km,
-                       window = borde_poly, marks = data_2010$sexo)
+                       window = borde_owin, marks = data_2010$sexo)
 
-# map per categories
+# Map per categories
 par(mfrow = c(1, 2))
 plot(gender_2009_ppp, main = "Homicides by Traffic Accidents per Gender (2009)", cols = 1:3)
 plot(gender_2010_ppp, main = "Homicides by Traffic Accidents per Gender (2010)", cols = 1:3)
+
+
+# Density estimation using Kernel
+
+density_male_2009 <- density(gender_2009_ppp[gender_2009_ppp$marks == "M"], sigma = bw.diggle)
+density_female_2009 <- density(gender_2009_ppp[gender_2009_ppp$marks == "F"], sigma = bw.diggle)
+
+density_male_2010 <- density(gender_2010_ppp[gender_2010_ppp$marks == "M"], sigma = bw.diggle)
+density_female_2010 <- density(gender_2010_ppp[gender_2010_ppp$marks == "F"], sigma = bw.diggle)
+
+
+par(mfrow = c(2, 2))
+plot(density_male_2009, main = "Density of Homicides (Male 2009)")
+plot(map_border, add = TRUE)
+plot(density_female_2009, main = "Density of Homicides (Female 2009)")
+plot(map_border, add = TRUE)
+
+plot(density_male_2010, main = "Density of Homicides (Male 2010)")
+plot(map_border, add = TRUE)
+plot(density_female_2010, main = "Density of Homicides (Female 2010)")
+plot(map_border, add = TRUE)
+
+#mtext("Density of Homicides by Traffic Accidents per Gender and Year", side = 3, outer = TRUE, line = -1.5, cex = 1.5)
+
+
+# Ripley's K function
+
+# 2009
+K_ripley_male_2009 <- Kest(gender_2009_ppp[gender_2009_ppp$marks == "M"])
+K_ripley_female_2009 <- Kest(gender_2009_ppp[gender_2009_ppp$marks == "F"])
+
+# 2010
+K_ripley_male_2010 <- Kest(gender_2010_ppp[gender_2010_ppp$marks == "M"])
+K_ripley_female_2010 <- Kest(gender_2010_ppp[gender_2010_ppp$marks == "F"])
+
+
+par(mfrow = c(2, 2))
+plot(K_ripley_male_2009, main = "Ripley's K function - Male (2009)", legend=FALSE)
+plot(K_ripley_female_2009, main = "Ripley's K function - Female (2009)", legend=FALSE)
+
+plot(K_ripley_male_2010, main = "Ripley's K function - Male (2010)", legend=FALSE)
+plot(K_ripley_female_2010, main = "Ripley's K function - Female (2010)", legend=FALSE)
+
+
 
 
 
 # AGE
 age_2009_ppp <- ppp(data_2009$coordenada_x_km, 
                     data_2009$coordenada_y_km, 
-                    window = borde_poly, 
+                    window = borde_owin, 
                     marks = data_2009$edad_agrupada)
 
 age_2010_ppp <- ppp(data_2010$coordenada_x_km,
                     data_2010$coordenada_y_km, 
-                    window = borde_poly, 
+                    window = borde_owin, 
                     marks = data_2010$edad_agrupada)
 
 # map per categories
 par(mfrow = c(1, 2))
 plot(age_2009_ppp, main = "Homicides by Traffic Accidents per Age Group (2009)", cols = 1:3)
 plot(age_2009_ppp, main = "Homicides by Traffic Accidents per Age Group (2010)", cols = 1:3)
+
+
+
+# Density estimation using Kernel
+
+# 2009 Density
+density_0_11_2009 <- density(age_2009_ppp[age_2009_ppp$marks == "0-11"], sigma = bw.diggle)
+density_12_18_2009 <- density(age_2009_ppp[age_2009_ppp$marks == "12-18"], sigma = bw.diggle)
+density_18_26_2009 <- density(age_2009_ppp[age_2009_ppp$marks == "18-26"], sigma = bw.diggle)
+density_27_59_2009 <- density(age_2009_ppp[age_2009_ppp$marks == "27-59"], sigma = bw.diggle)
+density_60_plus_2009 <- density(age_2009_ppp[age_2009_ppp$marks == "60+"], sigma = bw.diggle)
+
+# 2010 Density
+density_0_11_2010 <- density(age_2010_ppp[age_2010_ppp$marks == "0-11"], sigma = bw.diggle)
+density_12_18_2010 <- density(age_2010_ppp[age_2010_ppp$marks == "12-18"], sigma = bw.diggle)
+density_18_26_2010 <- density(age_2010_ppp[age_2010_ppp$marks == "18-26"], sigma = bw.diggle)
+density_27_59_2010 <- density(age_2010_ppp[age_2010_ppp$marks == "27-59"], sigma = bw.diggle)
+density_60_plus_2010 <- density(age_2010_ppp[age_2010_ppp$marks == "60+"], sigma = bw.diggle)
+
+par(mfrow = c(2, 5))
+
+# Gráficos para 2009
+plot(density_0_11_2009, main = "Density of Homicides (0-11 years, 2009)")
+plot(map_border, add = TRUE)
+plot(density_12_18_2009, main = "Density of Homicides (12-18 years, 2009)")
+plot(map_border, add = TRUE)
+plot(density_18_26_2009, main = "Density of Homicides (18-26 years, 2009)")
+plot(map_border, add = TRUE)
+plot(density_27_59_2009, main = "Density of Homicides (27-59 years, 2009)")
+plot(map_border, add = TRUE)
+plot(density_60_plus_2009, main = "Density of Homicides (60+ years, 2009)")
+plot(map_border, add = TRUE)
+
+# Gráficos para 2010
+#plot(density_0_11_2010, main = "Density of Homicides (0-11 years, 2010)")
+#plot(map_border, add = TRUE)
+plot(density_12_18_2010, main = "Density of Homicides (12-18 years, 2010)")
+plot(map_border, add = TRUE)
+plot(density_18_26_2010, main = "Density of Homicides (18-26 years, 2010)")
+plot(map_border, add = TRUE)
+plot(density_27_59_2010, main = "Density of Homicides (27-59 years, 2010)")
+plot(map_border, add = TRUE)
+plot(density_60_plus_2010, main = "Density of Homicides (60+ years, 2010)")
+plot(map_border, add = TRUE)
+
+
+
+# Ripley's K function
+
 
 
 # VEHICLE
@@ -719,6 +748,9 @@ par(mfrow = c(1, 2))
 plot(condition_2009_ppp, main = "Homicides by Traffic Accidents per Condition (2009)", cols = 1:3)
 plot(condition_2010_ppp, main = "Homicides by Traffic Accidents per Condition (2010)", cols = 1:3)
 
+# Density estimation using Kernel
+
+# Ripley's K function
 
 
 # Model fit --------------
