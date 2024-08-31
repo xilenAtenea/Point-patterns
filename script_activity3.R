@@ -655,14 +655,13 @@ K_ripley_male_2010 <- Kest(gender_2010_ppp[gender_2010_ppp$marks == "M"])
 K_ripley_female_2010 <- Kest(gender_2010_ppp[gender_2010_ppp$marks == "F"])
 
 
+
 par(mfrow = c(2, 2))
 plot(K_ripley_male_2009, main = "Ripley's K function - Male (2009)", legend=FALSE)
 plot(K_ripley_female_2009, main = "Ripley's K function - Female (2009)", legend=FALSE)
 
 plot(K_ripley_male_2010, main = "Ripley's K function - Male (2010)", legend=FALSE)
 plot(K_ripley_female_2010, main = "Ripley's K function - Female (2010)", legend=FALSE)
-
-
 
 
 
@@ -760,56 +759,201 @@ plot(condition_2010_ppp, main = "Homicides by Traffic Accidents per Condition (2
 # Model fit (Marked point patterns)--------------
 
 
-# Create point patterns for 2009 and 2010
-accidents_2009_ppp <- ppp(x = data_2009$coordenada_x_km, 
+### GENDER(Sexo) 2009###
+
+data_2009$sexo <- factor(data_2009$sexo, levels = c("F", "M"))
+
+# Create point patterns
+accidents_2009_sexo_ppp <- ppp(x = data_2009$coordenada_x_km, 
                           y = data_2009$coordenada_y_km, 
                           window = borde_owin,
                           marks = data_2009$sexo) 
-
-plot(accidents_2009_ppp)
-
-!!!  
-  # Tocó poner las tres variables como marcas porque si se ponia una sola ya no 
-  # era multitype y no se podía hacer el modelo despues. -> "data pattern is not multitype" 
-
-accidents_2010_ppp <- ppp(x = data_2010$coordenada_x_km, 
-                          y = data_2010$coordenada_y_km, 
-                          window = borde_owin)
-plot(accidents_2010_ppp)
-
-# Create quadrature scheme
-Q_2009 <- quadscheme(data = accidents_2009_ppp)
-Q_2010 <- quadscheme(data = accidents_2010_ppp)
-
-# The gridding scheme allows fitting spatial models 
-# by combining observed points with fictitious points, 
-# which helps to assess how covariates (such as sex, 
-# grouped age or condition) affect the spatial distribution of events in the study area.
+plot(accidents_2009_sexo_ppp)
 
 
+# Fitting the inhomogeneous Poisson model for the marked point pattern
+fit_marked <- ppm(accidents_2009_sexo_ppp, ~marks)
+
+plot(predict(fit_marked))
+
+# View the coefficients of the fitted model
+fit_marked$coef
+
+summary(fit_marked)
+
+
+# Este es un ejemplo siguiendo el código de Ramón Giraldo -----------------
+# Mostrar el patrón de puntos
+plot(accidents_2009_ppp, pch=20)
+
+# Proceso Poisson No Homogéneo con Marcas
+
+# Definir la función de intensidad lambda
+lambda <- function(x, y) {
+  100 * (x + y) # La intensidad aumenta con x e y
+}
+
+# Generar un proceso Poisson inhomogéneo basado en la función de intensidad
+nohomo <- rpoispp(lambda, win = borde_owin)
+summary(nohomo)
+
+# Visualizar el patrón no homogéneo
+plot(nohomo, main="Patrón Poisson No Homogéneo", pch=20)
+plot(density(nohomo), main="Estimación Kernel de la Intensidad No Homogénea")
+contour(density(nohomo), add=TRUE)
+points(nohomo, pch=20)
+
+# Ajuste de un modelo lineal a la intensidad usando las marcas
+fit_nohomo <- ppm(accidents_2009_ppp, ~marks + x + y) 
+summary(fit_nohomo)
+
+# Mostrar los coeficientes del modelo ajustado
+fit_nohomo$coef
+
+# Función para calcular la intensidad en un punto (x, y) usando los coeficientes ajustados
+lambda_lineal <- function(x, y, fit) {
+  lambda <- exp(fit[[1]] + fit[[2]] * x + fit[[3]] * y)
+  return(lambda)
+}
+
+# Estimar la intensidad en un punto específico
+x <- 0.7
+y <- 0.8
+lambda_estimada <- lambda_lineal(x, y, fit_nohomo$coef)
+print(lambda_estimada) # Estimación de la función de intensidad en x=0.7 y y=0.8
+
+# Comparar contra el gráfico de densidad
+par(mfrow=c(1,2))
+plot(density(nohomo), main="Patrón No Homogéneo - Estimación No Paramétrica")
+contour(density(nohomo), add=TRUE)
+points(x, y, col=2, pch=19)
+
+plot(fit_nohomo, se=FALSE, main="Modelo Lineal Ajustado a la Intensidad")
+points(x, y, col=2, pch=19)
+
+# Ajuste de un modelo polinomial
+fit_nohomo2 <- ppm(accidents_2009_ppp, ~polynom(x,2) + y)
+summary(fit_nohomo2)
+plot(fit_nohomo2, se=FALSE, main="Modelo Polinomial Ajustado")
+
+fit_nohomo3 <- ppm(accidents_2009_ppp, ~polynom(x, y, 2))
+summary(fit_nohomo3)
+plot(fit_nohomo3, se=FALSE, main="Modelo Polinomial con Interacción")
+
+# Comparación de modelos usando la tabla de desviación basada en la razón de verosimilitud
+anova(fit_nohomo, fit_nohomo2, test="Chi")
+anova(fit_nohomo2, fit_nohomo3, test="Chi")
 
 
 # -------------------------------------------------------------------------
 
-### GENDER  2009###
-Q <- quadscheme(data=accidents_2009_ppp)
-# df <- data.frame(Sexo = c(data_2009$sexo))
-df <- data.frame(Sexo = c(data_2009$sexo, rep(NA, n.quad(Q) - nrow(data_2009))))
 
-!!! 
-  # Se puso rep NA porque el tamaño del df no era el mismo que de Q, así que no permitia hacer el modelo.
+### GENDER(Sexo) 2010###
+data_2010$sexo <- factor(data_2010$sexo, levels = c("F", "M"))
 
-ppm(accidents_2009_ppp, ~ accidents_2009_ppp$marks, Poisson(), covariates=df)
-  # Se separaría cada df y luego se harían 6 modelos.
-
-### GENDER  2010###
+# Create point patterns
+accidents_2010_sexo_ppp <- ppp(x = data_2010$coordenada_x_km, 
+                          y = data_2010$coordenada_y_km, 
+                          window = borde_owin,
+                          marks = data_2010$sexo) 
+plot(accidents_2010_sexo_ppp)
 
 
+# Fitting the inhomogeneous Poisson model for the marked point pattern
+fit_marked <- ppm(accidents_2010_sexo_ppp, ~marks)
 
-# borrar ------------------------------------------------------------------
+plot(predict(fit_marked))
 
-model_p <- ppm(accidents_ppp ~ sexo + edad_agrupada + condicion)
-summary(model_p)
+# View the coefficients of the fitted model
+fit_marked$coef
 
-# Plot estimated intensity
-plot(predict(modelo_poisson, type = "trend"), main = "Intensidad Estimada")
+summary(fit_marked)
+
+
+### VEHICLE(Condicion) 2009###
+data_2009$condicion <- factor(data_2009$condicion, levels = c("MOTO", "PEATON", "CICLISTA", "VEHICULO"))
+
+# Create point patterns
+accidents_2009_condicion_ppp <- ppp(x = data_2009$coordenada_x_km, 
+                          y = data_2009$coordenada_y_km, 
+                          window = borde_owin,
+                          marks = data_2009$condicion) 
+plot(accidents_2009_condicion_ppp)
+
+
+# Fitting the inhomogeneous Poisson model for the marked point pattern
+fit_marked <- ppm(accidents_2009_condicion_ppp, ~marks)
+
+plot(predict(fit_marked))
+
+# View the coefficients of the fitted model
+fit_marked$coef
+
+summary(fit_marked)
+
+
+### VEHICLE(Condicion) 2010###
+data_2010$condicion <- factor(data_2010$condicion, levels = c("MOTO", "PEATON", "CICLISTA", "VEHICULO"))
+
+accidents_2010_condicion_ppp <- ppp(x = data_2010$coordenada_x_km, 
+                          y = data_2010$coordenada_y_km, 
+                          window = borde_owin,
+                          marks = data_2010$condicion) 
+plot(accidents_2010_condicion_ppp)
+
+# Fitting the inhomogeneous Poisson model for the marked point pattern
+fit_marked <- ppm(accidents_2010_condicion_ppp, ~marks)
+
+plot(predict(fit_marked))
+
+# View the coefficients of the fitted model
+fit_marked$coef
+
+summary(fit_marked)
+
+
+### AGE GROUP (Edad agrupada) 2009###
+
+data_2009$edad_agrupada <- factor(data_2009$edad_agrupada, levels = c("0-11", "12-18", "18-26", "27-59", "60+"))
+
+# Create point patterns
+accidents_2009_edad_agrupada_ppp <- ppp(x = data_2009$coordenada_x_km, 
+                                    y = data_2009$coordenada_y_km, 
+                                    window = borde_owin,
+                                    marks = data_2009$edad_agrupada) 
+plot(accidents_2009_edad_agrupada_ppp)
+
+
+# Fitting the inhomogeneous Poisson model for the marked point pattern
+fit_marked <- ppm(accidents_2009_edad_agrupada_ppp, ~marks)
+
+plot(predict(fit_marked))
+
+# View the coefficients of the fitted model
+fit_marked$coef
+
+summary(fit_marked)
+
+
+
+### AGE GROUP (Edad agrupada) 2010###
+
+data_2010$edad_agrupada <- factor(data_2010$edad_agrupada, levels = c("0-11", "12-18", "18-26", "27-59", "60+"))
+
+accidents_2010_edad_agrupada_ppp <- ppp(x = data_2010$coordenada_x_km, 
+                                    y = data_2010$coordenada_y_km, 
+                                    window = borde_owin,
+                                    marks = data_2010$edad_agrupada) 
+plot(accidents_2010_edad_agrupada_ppp)
+
+# Fitting the inhomogeneous Poisson model for the marked point pattern
+fit_marked <- ppm(accidents_2010_edad_agrupada_ppp, ~marks)
+
+plot(predict(fit_marked))
+
+# View the coefficients of the fitted model
+fit_marked$coef
+
+summary(fit_marked)
+
+
