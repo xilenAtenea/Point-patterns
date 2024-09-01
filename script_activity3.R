@@ -562,7 +562,6 @@ accidents_data$edad_agrupada <- cut(accidents_data$edad,
 data_2009 <- accidents_data %>% filter(ano == 2009)
 data_2010 <- accidents_data %>% filter(ano == 2010)
 
-
 # Spatial EDA
 
 # Map graphic
@@ -585,41 +584,47 @@ borde_owin<-as(map_border, "owin")
 accidents_2009_ppp <- ppp(
   x = data_2009$coordenada_x_km,
   y = data_2009$coordenada_y_km,
-  marks = data_2009[, c("sexo", "edad_agrupada", "condicion")],
   window = borde_owin)
-  
+
 accidents_2010_ppp <- ppp(
   x = data_2010$coordenada_x_km,
   y = data_2010$coordenada_y_km,
-  marks = data_2010[, c("sexo", "edad_agrupada", "condicion")],
   window = borde_owin)
 
 
 # Quadrant analysis
 
-quadrat_test_2009 <- quadrat.test(accidents_2009_ppp, nx = 4, ny = 4) # p-value = 2.7748e-14
+quadrat_test_2009 <- quadrat.test(accidents_2009_ppp, nx = 4, ny = 5) # p-value = 2.9055e-13
 quadrat_test_2009
 
-quadrat_test_2010 <- quadrat.test(accidents_2010_ppp, nx = 4, ny = 4) # p-value = 1.3277e-06
+quadrat_test_2010 <- quadrat.test(accidents_2010_ppp, nx = 4, ny = 5) # p-value = 4.9393e-07
 quadrat_test_2010
 
-# plottear quadrats -> elegir numero de cuadrantes
 
+# Quadrant frequency plot
+par(mfrow =c(1,2))
+plot(accidents_2009_ppp, cex = 0.5, pch = "+", main="2009")
+plot(quadratcount(accidents_2009_ppp, nx = 4, ny = 5), add=T, col=9)
+plot(cali_map, add=T, border=8)
+
+plot(accidents_2010_ppp, cex = 0.5, pch = "+", main="2010") 
+plot(quadratcount(accidents_2010_ppp, nx = 4, ny = 5), add=T, col=9)
+plot(cali_map, add = TRUE, border = 8)
 
 # variables exploratory analysis------------------------
 
 # GENDER ANALYSIS
 gender_2009_ppp <- ppp(data_2009$coordenada_x_km, data_2009$coordenada_y_km,
                        window = borde_owin, marks = data_2009$sexo)
-                  
+
 gender_2010_ppp <- ppp(data_2010$coordenada_x_km, data_2010$coordenada_y_km,
                        window = borde_owin, marks = data_2010$sexo)
 
 # Map per categories
 par(mfrow = c(1, 2))
-plot(gender_2009_ppp, main = "Homicides by Traffic Accidents per Gender (2009)", cols = 1:3)
-plot(gender_2010_ppp, main = "Homicides by Traffic Accidents per Gender (2010)", cols = 1:3)
-
+plot(gender_2009_ppp, main = "2009", cols = 1:3)
+plot(gender_2010_ppp, main = "2010", cols = 1:3)
+# caption: Homicides by Traffic Accidents per Gender
 
 # Density estimation using Kernel
 
@@ -631,37 +636,39 @@ density_female_2010 <- density(gender_2010_ppp[gender_2010_ppp$marks == "F"], si
 
 
 par(mfrow = c(2, 2))
-plot(density_male_2009, main = "Density of Homicides (Male 2009)")
+plot(density_male_2009, main = "Male (2009)")
 plot(map_border, add = TRUE)
-plot(density_female_2009, main = "Density of Homicides (Female 2009)")
+plot(density_female_2009, main = "Female (2009)")
 plot(map_border, add = TRUE)
 
-plot(density_male_2010, main = "Density of Homicides (Male 2010)")
+plot(density_male_2010, main = "Male (2010)")
 plot(map_border, add = TRUE)
-plot(density_female_2010, main = "Density of Homicides (Female 2010)")
+plot(density_female_2010, main = "Female (2010)")
 plot(map_border, add = TRUE)
 
 #mtext("Density of Homicides by Traffic Accidents per Gender and Year", side = 3, outer = TRUE, line = -1.5, cex = 1.5)
 
 
-# Ripley's K function
+# Inhomogeneous Ripley's K function
+
+# Ripley's K function if used for stationary and isotropic processes, so we use instead, the Kinhom() function 
+# to compute a generalization of the K function for inhomogeneous point patterns (Baddeley et al. 2000)
 
 # 2009
-K_ripley_male_2009 <- Kest(gender_2009_ppp[gender_2009_ppp$marks == "M"])
-K_ripley_female_2009 <- Kest(gender_2009_ppp[gender_2009_ppp$marks == "F"])
+K_inhom_male_2009 <- Kinhom(gender_2009_ppp[gender_2009_ppp$marks == "M"], lambda = density_male_2009)
+K_inhom_female_2009 <- Kinhom(gender_2009_ppp[gender_2009_ppp$marks == "F"], lambda = density_female_2009)
 
 # 2010
-K_ripley_male_2010 <- Kest(gender_2010_ppp[gender_2010_ppp$marks == "M"])
-K_ripley_female_2010 <- Kest(gender_2010_ppp[gender_2010_ppp$marks == "F"])
-
+K_inhom_male_2010 <- Kinhom(gender_2010_ppp[gender_2010_ppp$marks == "M"], lambda = density_male_2010)
+K_inhom_female_2010 <- Kinhom(gender_2010_ppp[gender_2010_ppp$marks == "F"], lambda = density_female_2010)
 
 
 par(mfrow = c(2, 2))
-plot(K_ripley_male_2009, main = "Ripley's K function - Male (2009)", legend=FALSE)
-plot(K_ripley_female_2009, main = "Ripley's K function - Female (2009)", legend=FALSE)
+plot(K_inhom_male_2009, main = "Male (2009)")
+plot(K_inhom_female_2009, main = "Female (2009)", legend=FALSE)
 
-plot(K_ripley_male_2010, main = "Ripley's K function - Male (2010)", legend=FALSE)
-plot(K_ripley_female_2010, main = "Ripley's K function - Female (2010)", legend=FALSE)
+plot(K_inhom_male_2010, main = "Male (2010)", legend=FALSE)
+plot(K_inhom_female_2010, main = "Female (2010)", legend=FALSE)
 
 
 
@@ -678,9 +685,9 @@ age_2010_ppp <- ppp(data_2010$coordenada_x_km,
 
 # map per categories
 par(mfrow = c(1, 2))
-plot(age_2009_ppp, main = "Homicides by Traffic Accidents per Age Group (2009)", cols = 1:3)
-plot(age_2009_ppp, main = "Homicides by Traffic Accidents per Age Group (2010)", cols = 1:3)
-
+plot(age_2009_ppp, main = "2009", cols = 1:3)
+plot(age_2010_ppp, main = "2010", cols = 1:3)
+# caption: Homicides by Traffic Accidents per Age Group
 
 
 # Density estimation using Kernel
@@ -688,72 +695,160 @@ plot(age_2009_ppp, main = "Homicides by Traffic Accidents per Age Group (2010)",
 # 2009 Density
 density_0_11_2009 <- density(age_2009_ppp[age_2009_ppp$marks == "0-11"], sigma = bw.diggle)
 density_12_18_2009 <- density(age_2009_ppp[age_2009_ppp$marks == "12-18"], sigma = bw.diggle)
-density_18_26_2009 <- density(age_2009_ppp[age_2009_ppp$marks == "18-26"], sigma = bw.diggle)
+density_18_26_2009 <- density(age_2009_ppp[age_2009_ppp$marks == "19-26"], sigma = bw.diggle)
 density_27_59_2009 <- density(age_2009_ppp[age_2009_ppp$marks == "27-59"], sigma = bw.diggle)
 density_60_plus_2009 <- density(age_2009_ppp[age_2009_ppp$marks == "60+"], sigma = bw.diggle)
 
 # 2010 Density
-density_0_11_2010 <- density(age_2010_ppp[age_2010_ppp$marks == "0-11"], sigma = bw.diggle)
+#density_0_11_2010 <- density(age_2010_ppp[age_2010_ppp$marks == "0-11"], sigma = bw.diggle)
 density_12_18_2010 <- density(age_2010_ppp[age_2010_ppp$marks == "12-18"], sigma = bw.diggle)
-density_18_26_2010 <- density(age_2010_ppp[age_2010_ppp$marks == "18-26"], sigma = bw.diggle)
+density_18_26_2010 <- density(age_2010_ppp[age_2010_ppp$marks == "19-26"], sigma = bw.diggle)
 density_27_59_2010 <- density(age_2010_ppp[age_2010_ppp$marks == "27-59"], sigma = bw.diggle)
 density_60_plus_2010 <- density(age_2010_ppp[age_2010_ppp$marks == "60+"], sigma = bw.diggle)
 
-# TODO Exportarla:
-par(mfrow = c(5, 2))
 
-# Gráficos para 2009
 # "Densidad de accidentes de tránsito fatales"
-plot(density_0_11_2009, main = "0-11 years, 2009") # TODO acortar titulos
-plot(map_border, add = TRUE)
-plot(density_12_18_2009, main = "Density of Homicides (12-18 years, 2009)")
-plot(map_border, add = TRUE)
-plot(density_18_26_2009, main = "Density of Homicides (18-26 years, 2009)")
-plot(map_border, add = TRUE)
-plot(density_27_59_2009, main = "Density of Homicides (27-59 years, 2009)")
-plot(map_border, add = TRUE)
-plot(density_60_plus_2009, main = "Density of Homicides (60+ years, 2009)")
+
+par(mar = c(2, 2, 1, 1))
+par(mfrow = c(4, 2))
+
+plot(density_0_11_2009, main = "0-11 years, 2009")
 plot(map_border, add = TRUE)
 
-# Gráficos para 2010
-plot(density_0_11_2010, main = "Density of Homicides (0-11 years, 2010)")
-#plot(map_border, add = TRUE)
-plot(density_12_18_2010, main = "Density of Homicides (12-18 years, 2010)")
+
+plot(density_12_18_2009, main = "12-18 years, 2009")
 plot(map_border, add = TRUE)
-plot(density_18_26_2010, main = "Density of Homicides (18-26 years, 2010)")
-plot(map_border, add = TRUE)
-plot(density_27_59_2010, main = "Density of Homicides (27-59 years, 2010)")
-plot(map_border, add = TRUE)
-plot(density_60_plus_2010, main = "Density of Homicides (60+ years, 2010)")
+plot(density_12_18_2010, main = "12-18 years, 2010")
 plot(map_border, add = TRUE)
 
+plot(density_18_26_2009, main = "18-26 years, 2009")
+plot(map_border, add = TRUE)
+plot(density_18_26_2010, main = "18-26 years, 2010")
+plot(map_border, add = TRUE)
+
+plot(density_27_59_2009, main = "27-59 years, 2009")
+plot(map_border, add = TRUE)
+plot(density_27_59_2010, main = "27-59 years, 2010")
+plot(map_border, add = TRUE)
+
+plot(density_60_plus_2009, main = "60+ years, 2009")
+plot(map_border, add = TRUE)
+plot(density_60_plus_2010, main = "60+ years, 2010")
+plot(map_border, add = TRUE)
 
 
 # Ripley's K function
+
+# 2009
+K_inhom_0_11_2009 <- Kinhom(age_2009_ppp[age_2009_ppp$marks == "0-11"], lambda = density_0_11_2009)
+K_inhom_12_18_2009 <- Kinhom(age_2009_ppp[age_2009_ppp$marks == "12-18"], lambda = density_12_18_2009)
+K_inhom_18_26_2009 <- Kinhom(age_2009_ppp[age_2009_ppp$marks == "18-26"], lambda = density_18_26_2009)
+K_inhom_27_59_2009 <- Kinhom(age_2009_ppp[age_2009_ppp$marks == "27-59"], lambda = density_27_59_2009)
+K_inhom_60_plus_2009 <- Kinhom(age_2009_ppp[age_2009_ppp$marks == "60+"], lambda = density_60_plus_2009)
+
+
+# 2010
+#K_inhom_0_11_2010 <- Kinhom(age_2009_ppp[age_2010_ppp$marks == "0-11"], lambda = density_0_11_2009)
+K_inhom_12_18_2010 <- Kinhom(age_2010_ppp[age_2010_ppp$marks == "12-18"], lambda = density_12_18_2010)
+K_inhom_18_26_2010 <- Kinhom(age_2010_ppp[age_2010_ppp$marks == "18-26"], lambda = density_18_26_2010)
+K_inhom_27_59_2010 <- Kinhom(age_2010_ppp[age_2010_ppp$marks == "27-59"], lambda = density_27_59_2010)
+K_inhom_60_plus_2010 <- Kinhom(age_2010_ppp[age_2010_ppp$marks == "60+"], lambda = density_60_plus_2010)
+
+par(mfrow = c(2, 3))
+plot(K_inhom_0_11_2009, main = "0-11 years (2009)")
+plot(K_inhom_12_18_2009, main = "12-18 years (2009)", legend=FALSE)
+plot(K_inhom_18_26_2009, main = "18-26 years (2009)", legend=FALSE)
+plot(K_inhom_27_59_2009, main = "27-59 years (2009)", legend=FALSE)
+plot(K_inhom_60_plus_2009, main = "60+ years (2009)", legend=FALSE)
+
+par(mfrow = c(2, 2))
+#plot(K_inhom_0_11_2010, main = "0-11 years", legend=FALSE) # makes no sense to graph as there's only one data point for this category
+plot(K_inhom_12_18_2010, main = "12-18 years (2010)", legend=FALSE)
+plot(K_inhom_18_26_2010, main = "18-26 years (2010)", legend=FALSE)
+plot(K_inhom_27_59_2010, main = "27-59 years (2010)", legend=FALSE)
+plot(K_inhom_60_plus_2010, main = "60+ years (2010)", legend=FALSE)
 
 
 
 # VEHICLE
 condition_2009_ppp <- ppp(data_2009$coordenada_x_km,
                           data_2009$coordenada_y_km,
-                          window = borde_poly, 
+                          window = borde_owin, 
                           marks = data_2009$condicion)
 
 condition_2010_ppp <- ppp(data_2010$coordenada_x_km,
                           data_2010$coordenada_y_km,
-                          window = borde_poly, 
+                          window = borde_owin, 
                           marks = data_2010$condicion)
 
 # map per categories
 par(mfrow = c(1, 2))
-plot(condition_2009_ppp, main = "Homicides by Traffic Accidents per Condition (2009)", cols = 1:3)
-plot(condition_2010_ppp, main = "Homicides by Traffic Accidents per Condition (2010)", cols = 1:3)
+plot(condition_2009_ppp, main = "2009", cols = 1:3)
+plot(condition_2010_ppp, main = "2010", cols = 1:3)
 
 # Density estimation using Kernel
 
+# 2009 Density
+density_moto_2009 <- density(condition_2009_ppp[condition_2009_ppp$marks == "MOTO"], sigma = bw.diggle)
+density_peaton_2009 <- density(condition_2009_ppp[condition_2009_ppp$marks == "PEATON"], sigma = bw.diggle)
+density_vehiculo_2009 <- density(condition_2009_ppp[condition_2009_ppp$marks == "VEHICULO"], sigma = bw.diggle)
+density_ciclista_2009 <- density(condition_2009_ppp[condition_2009_ppp$marks == "CICLISTA"], sigma = bw.diggle)
+
+# 2010 Density
+density_moto_2010 <- density(condition_2010_ppp[condition_2010_ppp$marks == "MOTO"], sigma = bw.diggle)
+density_peaton_2010 <- density(condition_2010_ppp[condition_2010_ppp$marks == "PEATON"], sigma = bw.diggle)
+density_vehiculo_2010 <- density(condition_2010_ppp[condition_2010_ppp$marks == "VEHICULO"], sigma = bw.diggle)
+density_ciclista_2010 <- density(condition_2010_ppp[condition_2010_ppp$marks == "CICLISTA"], sigma = bw.diggle)
+
+
+par(mar = c(2, 2, 1, 1))
+par(mfrow = c(4, 2))
+
+plot(density_moto_2009, main = "Motorcycle (2009)")
+plot(map_border, add = TRUE)
+plot(density_moto_2010, main = "Motorcycle (2010)")
+plot(map_border, add = TRUE)
+
+plot(density_peaton_2009, main = "Pedestrian (2009)")
+plot(map_border, add = TRUE)
+plot(density_peaton_2010, main = "Pedestrian (2010)")
+plot(map_border, add = TRUE)
+
+plot(density_ciclista_2009, main = "Cyclist (2009)")
+plot(map_border, add = TRUE)
+plot(density_ciclista_2010, main = "Cyclist (2010)")
+plot(map_border, add = TRUE)
+
+plot(density_vehiculo_2009, main = "Other Vehicle (2009)")
+plot(map_border, add = TRUE)
+plot(density_vehiculo_2010, main = "Other Vehicle (2010)")
+plot(map_border, add = TRUE)
+
+
 # Ripley's K function
 
+K_inhom_moto_2009 <- Kinhom(condition_2009_ppp[condition_2009_ppp$marks == "MOTO"], lambda = density_moto_2009)
+K_inhom_peaton_2009 <- Kinhom(condition_2009_ppp[condition_2009_ppp$marks == "PEATON"], lambda = density_peaton_2009)
+K_inhom_ciclista_2009 <- Kinhom(condition_2009_ppp[condition_2009_ppp$marks == "CICLISTA"], lambda = density_ciclista_2009)
+K_inhom_vehiculo_2009 <- Kinhom(condition_2009_ppp[condition_2009_ppp$marks == "VEHICULO"], lambda = density_vehiculo_2009)
 
+# 2010
+K_inhom_moto_2010 <- Kinhom(condition_2010_ppp[condition_2010_ppp$marks == "MOTO"], lambda = density_moto_2010)
+K_inhom_peaton_2010 <- Kinhom(condition_2010_ppp[condition_2010_ppp$marks == "PEATON"], lambda = density_peaton_2010)
+K_inhom_ciclista_2010 <- Kinhom(condition_2010_ppp[condition_2010_ppp$marks == "CICLISTA"], lambda = density_ciclista_2010)
+K_inhom_vehiculo_2010 <- Kinhom(condition_2010_ppp[condition_2010_ppp$marks == "VEHICULO"], lambda = density_vehiculo_2010)
+
+par(mfrow = c(2, 2))
+plot(K_inhom_moto_2009, main = "Motorcycle", legend=FALSE)
+plot(K_inhom_peaton_2009, main = "Pedestrian", legend=FALSE)
+plot(K_inhom_ciclista_2009, main = "Cyclist", legend=FALSE)
+plot(K_inhom_vehiculo_2009, main = "Other Vehicle", legend=FALSE)
+
+par(mfrow = c(2, 2))
+plot(K_inhom_moto_2010, main = "Motorcycle", legend=FALSE)
+plot(K_inhom_peaton_2010, main = "Pedestrian", legend=FALSE)
+plot(K_inhom_ciclista_2010, main = "Cyclist", legend=FALSE)
+plot(K_inhom_vehiculo_2010, main = "Other Vehicle", legend=FALSE)
 
 
 # Model fit (Marked point patterns)--------------
